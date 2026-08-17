@@ -28,7 +28,7 @@ Stati: 🔴 non iniziato · 🟡 in corso · 🟢 fatto · ⚪ bloccato
 ## SHARED
 | ID | Componente | Stato | Note / Task |
 |----|-----------|-------|-------------|
-| SH1 | Layer JSON (de)serialization | 🔴 | scelta lib vs hand-roll |
+| SH1 | Layer JSON (de)serialization | 🟢 | **GSON 2.11.0** in `lib/gson-2.11.0.jar` (scaricato+verificato) |
 | SH2 | Definizione messaggi + codici errore | 🔴 | vedere `protocol.md` |
 | SH3 | Auth (hash password + salt) | 🔴 | mai plaintext |
 

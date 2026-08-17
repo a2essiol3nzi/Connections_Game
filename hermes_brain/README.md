@@ -32,6 +32,15 @@ Gioco "Connections" (NYT) implementato in **Java** con architettura **client-ser
 - Consegna: JAR eseguibile client + JAR eseguibile server, file di config
   separati (client/server), NO parametri interattivi/CLI. PDF relazione ≤5 pag.
 
+## Build & dipendenze (stato attuale)
+- **GSON 2.11.0** scaricato in `lib/gson-2.11.0.jar` (298 KB, verificato con
+  probe di compilazione/esecuzione). NIX NON usato: jar progetto-locale, così è
+  anche già pronto per la consegna (§4 "jar allegati").
+- Compilazione: `javac -cp lib/gson-2.11.0.jar -d out $(find src -name '*.java')`
+- Esecuzione: `java -cp out:lib/gson-2.11.0.jar ServerMain` (e `ClientMain`)
+- JAR consegna: manifest `Main-Class` in `server.jar`/`client.jar`; allegare
+  `lib/gson-2.11.0.jar` nel pacchetto zip. Documentare classpath nel PDF.
+
 ## Vincoli di naming (§4)
 - Classi con `main` → nome contenente `"Main"` (es. `ServerMain`, `ClientMain`).
 - Codice commentato. Librerie esterne → allegate come jar.
