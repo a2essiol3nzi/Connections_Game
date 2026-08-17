@@ -16,9 +16,19 @@ Gioco "Connections" (NYT) implementato in **Java** con architettura **client-ser
 - Client deve usare **NIO** per la connessione TCP.
 - Server **multithreaded con thread pooling**.
 - Strutture dati server **sincronizzate**.
+- **Vincolo sync (utente, 17/08): solo monitor + `synchronized`**. NIENTE
+  lock manuali (`java.util.concurrent.locks.Lock`/`ReentrantLock`). Consentiti:
+  `synchronized` (metodi/blocchi), `wait()`/`notify()`/`notifyAll()`, `volatile`.
+  Da confermare: `ConcurrentHashMap`/`Atomic*` (utility stdlib, non lock manuali)
+  → ammessi salvo tu voglia il rigore estremo "tutto synchronized".
 - Notifiche asincrone (es. fine partita a timeout) via **UDP**.
 - Persistenza (utenti + partite) in file **JSON**.
 - **No multicast UDP** (solo vecchio ordinamento) → notifiche UDP unicast.
+- **CONCORRENZA (vincolo utente, definitivo):** sincronizzazione SOLO con
+  `synchronized` (monitor), `wait()`/`notifyAll()` e `java.util.concurrent.
+  atomic.*`. **VIETATO** `java.util.concurrent.locks.*` (Lock/ReentrantLock/
+  ReadWriteLock/StampedLock) e lock manuali. Ammessi: `volatile`, thread pool.
+  Dettagli in `gotchas.md` §2.
 - Consegna: JAR eseguibile client + JAR eseguibile server, file di config
   separati (client/server), NO parametri interattivi/CLI. PDF relazione ≤5 pag.
 

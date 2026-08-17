@@ -45,20 +45,27 @@ Convenzione risposta (da definire, §5 lascia aperto il formato):
 - Esempi spec: (1 err,1 corr,1 err,timeout) → 6-8 = **-2** ✓
 - win con 3 errori → 18-12 = **+6** ✓; loss → max **-16** ✓
 
-## Schema JSON partite (DA CONFERMARE — file mancante, vedi status S2)
-Proposto (interpretabile):
+## Schema JSON partite (CONFERMATO dall'utente — vedi status S2)
+File ~620KiB, **array JSON top-level** di 911 oggetti, tutti dello stesso shape:
 ```json
-{ "games": [
-  { "id": 1,
+[
+  {
+    "gameId": 0,
     "groups": [
-      {"category": "CAT", "words": ["w1","w2","w3","w4"]},
-      {"category": "CAT", "words": ["w5","w6","w7","w8"]},
-      {"category": "CAT", "words": ["w9","w10","w11","w12"]},
-      {"category": "CAT", "words": ["w13","w14","w15","w16"]}
-    ] }
-] }
+      {"theme": "WET WEATHER",  "words": ["SNOW","HAIL","RAIN","SLEET"]},
+      {"theme": "NBA TEAMS",    "words": ["HEAT","BUCKS","JAZZ","NETS"]},
+      {"theme": "KEYBOARD KEYS","words": ["SHIFT","TAB","RETURN","OPTION"]},
+      {"theme": "PALINDROMES",  "words": ["LEVEL","KAYAK","RACECAR","MOM"]}
+    ]
+  }
+]
 ```
-Server invia le 16 parole **mescolate**; i 4 gruppi restano lato server.
+- **Array top-level** (NON `{games:[...]}`).
+- `gameId`: int (0..910) → id partita.
+- `groups`: 4 elementi, ognuno `theme` (stringa categoria) + `words` (4 stringhe).
+- Server invia le 16 parole **mescolate**; `groups`/`theme` restano lato server.
+- Caricamento: **una volta all'avvio** in memoria. # ponytail: load once;
+  qui 620KiB/911 partite è trascurabile; per file realmente enorme → streaming.
 
 ## Notifiche async UDP (§2.2, §3)
 Al termine partita (timeout globale o chiusura per tutti): il server invia a

@@ -17,12 +17,19 @@ receiver + thread main per la CLI; stato locale protetto da lock semplice.
   persistente, non one-shot).
 - **Scheduler thread** gestisce ciclo di vita partita: start → attesa timeout →
   end + notifiche UDP → start successiva. Deve sincronizzare la sostituzione
-  dell'`activeGame` (es. `AtomicReference` o lock) con gli handler.
+  dell'`activeGame` con gli handler.
 - **Persistenza periodica** su thread dedicato: scrittura JSON atomica
   (temp + rename) per evitare corruption al riavvio.
-- Sync primitiva: `ConcurrentHashMap` per utenti; **lock globale sul Game**
-  per le mutazioni di stato (proposte). # ponytail: lock globale sul game;
-  per-account lock solo se servono throughput reali.
+- **VINCOLO SINCRONIZZAZIONE (utente, DEFINITIVO):** per la sincronizzazione
+  si usano SOLO monitor Java (`synchronized`), `wait()`/`notifyAll()` e classi
+  `java.util.concurrent.atomic.*` (AtomicReference, AtomicInteger, …).
+  **VIETATO** `java.util.concurrent.locks.*` (`Lock`, `ReentrantLock`,
+  `ReadWriteLock`, `StampedLock`) e qualsiasi lock manuale. Ammessi: `volatile`
+  e `ExecutorService` (thread pool) — il divieto riguarda i **lock**, non il
+  pooling. Pattern: sezioni `synchronized` su `activeGame`/store condivisi;
+  `wait`/`notifyAll` per attese condizionali (es. scheduler in attesa di fine
+  partita). # ponytail: synchronized globale sul Game copre il caso; restringere
+  la sezione critica se serve throughput, mai introdurre Lock.
 
 ## 3. Distinzione malformata / errata (§2.2)
 Facile da sbagliare: una proposta con parole già trovate o fuori gioco è
@@ -54,12 +61,13 @@ Outcome per partita ∈ {WON, LOST(4 errori), NOT_FINISHED(timeout)}.
 §2.1 non dice come ordinare la leaderboard. Scegliere (es. punteggio cumulativo
 su tutte le partite, o win rate) e documentarlo nel PDF. Impatta S9.
 
-## 7. File JSON partite MANCANTE
-Nel repo non c'è il file delle 911 partite citato in §2.2. **Blocco runtime**.
-Recuperare dal docente; nel frattempo generare dataset di test con lo schema in
-`protocol.md`. Gestire comunque il caricamento "come se grande" (streaming o
-caricamento lazy se serve; per 911 è trascurabile). # ponytail: load in
-memoria ok per 911; se file enorme, memory-map/streaming.
+## 7. File JSON partite (schema CONFERMATO)
+Schema: **array top-level** di 911 `{gameId:int, groups:[{theme:str,
+words:[4 str]}]}` (vedi `protocol.md`). File ~620KiB, non nel repo e non
+caricabile → va posizionato manualmente (es. `data/games.json`). §2.2 chiede di
+gestirlo "come se grande": **read-once all'avvio** in memoria, mai riletto per
+richiesta. # ponytail: load once ok per 620KiB; se file realmente enorme →
+streaming lazy. La parola `theme` è la categoria nascosta (mai inviata al client).
 
 ## 8. Persistenza e riavvio
 Utenti + storico partite su JSON, coerenti, riusabili al restart. Decidere se

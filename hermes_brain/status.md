@@ -6,10 +6,10 @@ Stati: 🔴 non iniziato · 🟡 in corso · 🟢 fatto · ⚪ bloccato
 | ID | Componente | Stato | Note / Task |
 |----|-----------|-------|-------------|
 | S1 | Config loader (`server.properties`) | 🔴 | porte, durata partita, path JSON, periodo persistenza |
-| S2 | Loader JSON partite (sorgente docenti) | ⚪ | **FILE MANCANTE** nel repo — richiedere/ottenere; definire schema atteso |
+| S2 | Loader JSON partite (sorgente docenti) | 🔴 | schema **CONFERMATO** (array top-level, gameId/theme/words); file ~620KiB non nel repo → da posizionare; scrivere loader read-once |
 | S3 | User store + persistenza JSON | 🔴 | `Map<username,User>`; hash password; save/load atomico |
-| S4 | Game model + logica valutazione | 🔴 | 16 parole, 4 gruppi; eval proposta; distinzione malformata/errata |
-| S5 | Scheduler partita attiva | 🔴 | start/timeout/end + avvio successiva; lock su `activeGame` |
+| S4 | Game model + logica valutazione | 🔴 | 16 parole, 4 gruppi; eval proposta; distinzione malformata/errata; mutazioni sotto `synchronized` |
+| S5 | Scheduler partita attiva | 🔴 | start/timeout/end + avvio successiva; sync via `synchronized`+`wait/notify` su `activeGame` (NO Lock) |
 | S6 | TCP acceptor + thread pool | 🔴 | `ServerSocket` + `ExecutorService` (fixed) |
 | S7 | Handler per-client (dispatch protocollo) | 🔴 | ciclo read JSON → azione → write JSON |
 | S8 | Sender notifiche async UDP | 🔴 | fine partita → broadcast UDP ai partecipanti |
@@ -41,6 +41,7 @@ Stati: 🔴 non iniziato · 🟡 in corso · 🟢 fatto · ⚪ bloccato
 | B4 | PDF relazione ≤5 pag | 🔴 | schema thread, strutture dati, sync, istruzioni |
 
 ## Blocchi critici
-- ⚪ **S2**: il JSON delle 911 partite non è nel repo. Senza di esso il server
-  non ha dati di gioco → blocco runtime. Recuperare dal docente o generare
-  dataset di test con lo schema definito in `protocol.md`/README.
+- 🔴 **S2**: schema JSON partite **confermato** (vedi `protocol.md`): array
+  top-level di 911 `{gameId, groups:[{theme, words:[4]}]}`. Il file (~620KiB)
+  NON è nel repo e l'utente non può caricarlo → va posizionato manualmente
+  (es. `data/games.json`) prima del run. Loader da scrivere: read-once all'avvio.
