@@ -1,47 +1,35 @@
-# Board di sviluppo (Second Brain)
+# STATUS — Server Connections (Java)
 
-Stati: 🔴 non iniziato · 🟡 in corso · 🟢 fatto · ⚪ bloccato
-
-## SERVER
-| ID | Componente | Stato | Note / Task |
-|----|-----------|-------|-------------|
-| S1 | Config loader (`server.properties`) | 🔴 | porte, durata partita, path JSON, periodo persistenza |
-| S2 | Loader JSON partite (sorgente docenti) | 🔴 | schema **CONFERMATO** (array top-level, gameId/theme/words); file ~620KiB non nel repo → da posizionare; scrivere loader read-once |
-| S3 | User store + persistenza JSON | 🔴 | `Map<username,User>`; hash password; save/load atomico |
-| S4 | Game model + logica valutazione | 🔴 | 16 parole, 4 gruppi; eval proposta; distinzione malformata/errata; mutazioni sotto `synchronized` |
-| S5 | Scheduler partita attiva | 🔴 | start/timeout/end + avvio successiva; sync via `synchronized`+`wait/notify` su `activeGame` (NO Lock) |
-| S6 | TCP acceptor + thread pool | 🔴 | `ServerSocket` + `ExecutorService` (fixed) |
-| S7 | Handler per-client (dispatch protocollo) | 🔴 | ciclo read JSON → azione → write JSON |
-| S8 | Sender notifiche async UDP | 🔴 | fine partita → broadcast UDP ai partecipanti |
-| S9 | Classifica + statistiche | 🔴 | leaderboard (metrica da definire), stats partita/giocatore |
-| S10 | Thread persistenza periodica | 🔴 | salvataggio utenti+storico a intervalli |
+## SERVER (P0 foundation + P1 logic + P2 in corso)
+| ID | Componente | Stato | Note |
+|----|-----------|-------|------|
+| S1 | Config (`core/ServerConfig`) | 🟢 | arg opzionale path; gestione eccezioni esplicita |
+| S2 | Loader partite (`loader/GameLoader`) | 🟢 | **PIGRO**: indicizzazione span via RandomAccessFile + `gameAt(i)` on-demand; `stream()` lazy; verificato |
+| S3 | UserStore (`persistence/UserStore`) | 🟢 | **id immutabile** + indice `nameToId`; **per-account lock**; psw in chiaro (doc); persist atomico; verificato |
+| S4 | Game model (`core/ActiveGame`/`PlayerState`) | 🟢 | valutazione malformata/errata; score; outcome; verificato |
+| S5 | Scheduler (`network/GameScheduler`) | 🟢 | sleep→finalize→UDP→rotate |
+| S6 | TCP acceptor+pool (`network/ConnectionAcceptor`) | 🟢 | |
+| S7 | Handler (`network/ClientHandler`) | 🟢 | dispatch 9 op; gate loggedIn; return-convention null=OK |
+| S8 | UDP notifier (`network/UdpNotifier`) | 🟡 | pronto; ricezione client in P2 |
+| S9 | Classifica+stats (`core/GameManager`) | 🟢 | leaderboard (cumulative), game/player stats; verificato |
+| S10 | Persistenza (`persistence/PersistenceThread`) | 🟢 | |
+| S11 | Protocollo errori (`protocol/Errors`) | 🟢 | enum centralizzato; `null`=OK |
+| S12 | Envelope (`protocol/Request`/`Response`) | 🟢 | |
 
 ## CLIENT
-| ID | Componente | Stato | Note / Task |
-|----|-----------|-------|-------------|
-| C1 | Config loader (`client.properties`) | 🔴 | host/porta server, porta UDP locale |
-| C2 | Connessione TCP + NIO (Selector) | 🔴 | `SocketChannel` non-blocking; send/recv JSON |
-| C3 | Receiver notifiche UDP | 🔴 | `DatagramSocket` thread dedicato |
-| C4 | CLI / menu comandi | 🔴 | registrazione, login, proposte, query, stats |
-| C5 | Stato locale + render info | 🔴 | snapshot partita, stats, disegno tabellare |
+| ID | Componente | Stato | Note |
+|----|-----------|-------|------|
+| C1 | Client NIO (SocketChannel+Selector) | 🔴 | da fare (P2) |
+| C2 | Client UDP receiver | 🔴 | da fare (P2) |
+| C3 | Client CLI + render | 🔴 | da fare (P2) |
+| C4 | Client State holder | 🔴 | da fare (P2) |
 
-## SHARED
-| ID | Componente | Stato | Note / Task |
-|----|-----------|-------|-------------|
-| SH1 | Layer JSON (de)serialization | 🟢 | **GSON 2.11.0** in `lib/gson-2.11.0.jar` (scaricato+verificato) |
-| SH2 | Definizione messaggi + codici errore | 🔴 | vedere `protocol.md` |
-| SH3 | Auth (hash password + salt) | 🔴 | mai plaintext |
+## CONSEGNA (§4)
+- [ ] JAR server + JAR client (Main in `core.ServerMain` / `client.ClientMain`)
+- [ ] `server.properties` + `client.properties`
+- [ ] PDF relazione ≤5 pag (schema thread, strutture dati, sync, istruzioni)
+- [ ] allegare `lib/gson-2.11.0.jar`
 
-## BUILD & CONSEGNA
-| ID | Componente | Stato | Note / Task |
-|----|-----------|-------|-------------|
-| B1 | Compilazione `javac` pulita | 🔴 | no file IDE |
-| B2 | JAR eseguibili (client+server) | 🔴 | `Main-Class` in manifest |
-| B3 | File di config (client/server) | 🔴 | no param interattivi/CLI |
-| B4 | PDF relazione ≤5 pag | 🔴 | schema thread, strutture dati, sync, istruzioni |
-
-## Blocchi critici
-- 🔴 **S2**: schema JSON partite **confermato** (vedi `protocol.md`): array
-  top-level di 911 `{gameId, groups:[{theme, words:[4]}]}`. Il file (~620KiB)
-  NON è nel repo e l'utente non può caricarlo → va posizionato manualmente
-  (es. `data/games.json`) prima del run. Loader da scrivere: read-once all'avvio.
+## VERIFICHE (ad-hoc, /tmp, rimosse)
+- P0 envelope OK; P1 logic 27/27; P1 live roundtrip OK.
+- Restruct: 22/22 (lazy loader, id store, rotation, socket live OK).

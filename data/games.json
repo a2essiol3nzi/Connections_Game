@@ -1,0 +1,20 @@
+[
+  {
+    "gameId": 0,
+    "groups": [
+      { "theme": "WET WEATHER",    "words": ["SNOW", "HAIL", "RAIN", "SLEET"] },
+      { "theme": "NBA TEAMS",      "words": ["HEAT", "BUCKS", "JAZZ", "NETS"] },
+      { "theme": "KEYBOARD KEYS",  "words": ["SHIFT", "TAB", "RETURN", "OPTION"] },
+      { "theme": "PALINDROMES",    "words": ["LEVEL", "KAYAK", "RACECAR", "MOM"] }
+    ]
+  },
+  {
+    "gameId": 1,
+    "groups": [
+      { "theme": "COLORS",        "words": ["RED", "BLUE", "GREEN", "PINK"] },
+      { "theme": "PLANETS",       "words": ["MARS", "VENUS", "EARTH", "SATURN"] },
+      { "theme": "FRUITS",        "words": ["APPLE", "PEAR", "GRAPE", "LEMON"] },
+      { "theme": "ANIMALS",       "words": ["CAT", "DOG", "FROG", "BEAR"] }
+    ]
+  }
+]

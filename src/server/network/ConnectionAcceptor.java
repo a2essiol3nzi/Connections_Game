@@ -1,0 +1,38 @@
+package server.network;
+
+import server.core.Context;
+
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+
+/**
+ * Accetta connessioni TCP e le smista a thread del pool (thread pooling, §3).
+ * Una connessione per client resta aperta per tutta la sessione (persistente).
+ * Pacchetto `network`: comunicazione socket lato server.
+ */
+public class ConnectionAcceptor implements Runnable {
+
+    private final int port;
+    private final ExecutorService pool;
+    private final Context ctx;
+
+    public ConnectionAcceptor(int port, ExecutorService pool, Context ctx) {
+        this.port = port;
+        this.pool = pool;
+        this.ctx = ctx;
+    }
+
+    @Override
+    public void run() {
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            while (true) {
+                Socket client = serverSocket.accept();
+                pool.submit(new ClientHandler(client, ctx));
+            }
+        } catch (IOException e) {
+            System.err.println("[Acceptor] terminato: " + e.getMessage());
+        }
+    }
+}
