@@ -4,11 +4,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.Properties;
 
-/**
- * Carica i parametri del server da un file .properties all'avvio
- * (§4: i parametri devono essere letti da file, NON interattivamente né da CLI).
- * Campi `public final` tipizzati: letti una volta e poi immutabili.
- */
+// Carica i parametri del server da un file .properties all'avvio
 public class ServerConfig {
 
     public final int tcpPort;

@@ -6,7 +6,7 @@ import server.persistence.UserStore;
 
 /**
  * Contenitore delle risorse condivise del server, passato agli handler e agli
- * altri componenti. Evita singleton globali: un'unica istanza creata in
+ * altri componenti. Evita oggett globali: un'unica istanza creata in
  * ServerMain e condivisa per referenza. Raggruppa loader/store/manager/notifier.
  */
 public class Context {

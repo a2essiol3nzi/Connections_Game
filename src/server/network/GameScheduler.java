@@ -5,12 +5,14 @@ import server.core.GameManager;
 import server.persistence.UserStore;
 import com.google.gson.JsonObject;
 
+import java.io.IOException;
 import java.util.Set;
 
 /**
  * Scheduler della partita attiva (unico thread). Ciclo:
  *   attende scadenza partita corrente → finalizza (esiti+UserStore) →
- *   invia notifica UDP a tutti i partecipanti → ruota alla partita successiva.
+ *   persist event-driven (stat su disco subito) → invia notifica UDP a tutti
+ *   i partecipanti → ruota alla partita successiva.
  * Coordinazione via Thread.sleep fino a endTime (no wait/notify necessario).
  * Lo swap di ActiveGame avviene in GameManager.rotate (synchronized).
  * Pacchetto `network`: comunicazione/thread di servizio server.
@@ -36,6 +38,11 @@ public class GameScheduler implements Runnable {
             if (waitMs > 0) sleep(waitMs);
 
             gm.finalizeGame(users);
+            try {
+                users.persist(); // persist event-driven: stat su disco subito, non entro 30s
+            } catch (IOException e) {
+                System.err.println("[Scheduler] persist failed: " + e.getMessage());
+            }
             Set<String> parts = g.participants();
             JsonObject note = new JsonObject();
             note.addProperty("type", "GAME_ENDED");

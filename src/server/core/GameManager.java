@@ -8,6 +8,7 @@ import server.persistence.UserStore;
 import server.protocol.Errors;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -16,8 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * GameManager: cuore della LOGICA DI GIOCO lato server.
  *
- * Cambiamento rispetto alla versione precedente: il caricatore delle partite è
- * ORA PIGRO (vedi `loader.GameLoader`): le partite NON stanno tutte in RAM.
+ * Il caricatore delle partite è PIGRO: le partite NON stanno tutte in RAM.
  * GameManager tiene quindi solo l'UNICA partita attiva e, a ogni rotazione,
  * ne chiede UNA al loader tramite `gameAt(indice casuale)`.
  *
@@ -36,11 +36,10 @@ public class GameManager {
     private final GameLoader loader;          // sorgente partite PIGRO
     private final int durationSec;           // durata partita (da config)
     private final Random rnd = new Random();
+    private final Iterator<GameData> games;  // iteratore ciclico sul loader pigro
 
     // Partita globale attiva (null solo se il loader è vuoto).
     private ActiveGame current;
-    // Indice (ciclico) della prossima partita da servire: gameId = nextIdx % total.
-    private int nextIdx = 0;
     // Storico partite CONCLUSE: gameId -> (username -> esito/score).
     private final Map<Integer, GameHistory> history = new ConcurrentHashMap<>();
 
@@ -55,16 +54,15 @@ public class GameManager {
     public GameManager(GameLoader loader, int durationSec) {
         this.loader = loader;
         this.durationSec = durationSec;
+        this.games = loader.cyclicIterator();
         this.current = makeNext(System.currentTimeMillis());
     }
 
-    /** Costruisce la prossima partita: indice ciclico sul loader pigro. */
+    /** Costruisce la prossima partita: ciclo sul loader pigro. */
     private ActiveGame makeNext(long nowMs) {
         if (loader.total() == 0) return null;
-        int idx = nextIdx % loader.total();
-        nextIdx++;
         try {
-            GameData src = loader.gameAt(idx);
+            GameData src = games.next();
             return new ActiveGame(src, nowMs, durationSec * 1000L, rnd);
         } catch (Exception e) {
             System.err.println("[GameManager] caricamento partita fallito: " + e.getMessage());

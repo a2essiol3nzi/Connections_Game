@@ -16,7 +16,8 @@ import java.util.concurrent.Executors;
  *   2. crea il GameLoader (streaming Gson, memoria O(1): nessuna partita in RAM);
  *   3. costruisce il Context (risorse condivise);
  *   4. avvia scheduler partita e thread di persistenza;
- *   5. apre l'acceptor TCP sul thread principale (bloccante).
+ *   5. registra lo shutdown hook (su SIGTERM/SIGINT salva UserStore su disco);
+ *   6. apre l'acceptor TCP sul thread principale (bloccante).
  */
 public class ServerMain {
 
@@ -51,7 +52,17 @@ public class ServerMain {
         new Thread(new GameScheduler(ctx.games, ctx.users, ctx.notifier), "scheduler").start();
         new Thread(new PersistenceThread(ctx.users, cfg.persistIntervalSec), "persist").start();
 
-        // 5) acceptor TCP sul thread principale
+        // 5) shutdown hook: SIGTERM/SIGINT -> persist prima di uscire (no perdita ultima partita)
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                ctx.users.persist();
+                System.out.println("[Server] users saved on shutdown");
+            } catch (IOException e) {
+                System.err.println("[Server] shutdown persist failed: " + e.getMessage());
+            }
+        }));
+
+        // 6) acceptor TCP sul thread principale
         var pool = Executors.newFixedThreadPool(cfg.poolSize);
         ConnectionAcceptor acceptor = new ConnectionAcceptor(cfg.tcpPort, pool, ctx);
         System.out.println("[Server] listening on TCP " + cfg.tcpPort + " (UDP " + cfg.udpPort + ")");
