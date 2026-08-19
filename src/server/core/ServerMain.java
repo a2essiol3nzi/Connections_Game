@@ -13,7 +13,7 @@ import java.util.concurrent.Executors;
  *
  * Sequenza di avvio:
  *   1. legge la config (server.properties o path passato come argomento);
- *   2. crea il GameLoader PIGRO (indicizza gli offset, non carica le partite);
+ *   2. crea il GameLoader (streaming Gson, memoria O(1): nessuna partita in RAM);
  *   3. costruisce il Context (risorse condivise);
  *   4. avvia scheduler partita e thread di persistenza;
  *   5. apre l'acceptor TCP sul thread principale (bloccante).
@@ -33,7 +33,7 @@ public class ServerMain {
             return;
         }
 
-        // 2) loader pigro (solo indicizzazione offset)
+        // 2) loader pigro (streaming Gson, memoria O(1))
         GameLoader loader;
         try {
             loader = new GameLoader(cfg.gamesFile);
@@ -42,7 +42,7 @@ public class ServerMain {
             System.exit(3);
             return;
         }
-        System.out.println("[Server] indexed " + loader.total() + " games from " + cfg.gamesFile);
+        System.out.println("[Server] loaded " + loader.total() + " games from " + cfg.gamesFile);
 
         // 3) risorse condivise
         Context ctx = new Context(cfg, loader);

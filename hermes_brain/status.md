@@ -4,7 +4,7 @@
 | ID | Componente | Stato | Note |
 |----|-----------|-------|------|
 | S1 | Config (`core/ServerConfig`) | 🟢 | arg opzionale path; gestione eccezioni esplicita |
-| S2 | Loader partite (`loader/GameLoader`) | 🟢 | **PIGRO**: indicizzazione span via RandomAccessFile + `gameAt(i)` on-demand; `stream()` lazy; verificato |
+|| S2 | Loader partite (`loader/GameLoader`) | 🟢 | **PIGRO**: streaming Gson `JsonReader` (memoria O(1)); `cyclicIterator()`; verificato |
 | S3 | UserStore (`persistence/UserStore`) | 🟢 | **id immutabile** + indice `nameToId`; **per-account lock**; psw in chiaro (doc); persist atomico; verificato |
 | S4 | Game model (`core/ActiveGame`/`PlayerState`) | 🟢 | valutazione malformata/errata; score; outcome; verificato |
 | S5 | Scheduler (`network/GameScheduler`) | 🟢 | sleep→finalize→UDP→rotate |
