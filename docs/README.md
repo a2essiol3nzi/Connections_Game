@@ -11,7 +11,7 @@ server/
     ActiveGame.java      partita attiva + valutazione proposte
     PlayerState.java     stato giocatore nella partita
   loader/     caricamento partite
-    GameLoader.java      loader PIGRO (indicizzazione span + gameAt on-demand)
+    GameLoader.java      loader PIGRO (streaming Gson JsonReader, iteratore ciclico O(1))
   persistence/ salvataggio/caricamento stato
     UserStore.java       utenti (id immutabile, per-account lock, psw chiara)
     PersistenceThread.java  salvataggio periodico
