@@ -1,6 +1,7 @@
 package server.loader;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import com.google.gson.stream.JsonReader;
 import server.model.GameData;
 
@@ -56,35 +57,54 @@ public class GameLoader {
     /**
      * Generatore lazy: scorre gli oggetti uno a uno, ciclico all'infinito.
      * Ogni next() parsa UN solo oggetto (memoria costante); alla fine del file
-     * il reader viene riaperto e il ciclo ricomincia.
+     * il reader viene riaperto e il ciclo ricomincia. Su un oggetto illeggibile
+     * si riapre e si riprende dal successivo (mai spin/loop infinito).
      */
     public Iterator<GameData> cyclicIterator() {
         return new Iterator<>() {
             private JsonReader reader;
             private boolean open = false;
+            private int index = 0; // oggetti già emessi con successo (per riallineare dopo un errore)
 
-            private void ensureOpen() {
-                if (open) 
-                    return;
-                try {
-                    reader = open();
-                    reader.beginArray();
-                    open = true;
-                } catch (IOException e) { throw new UncheckedIOException(e); }
+            private void reopen() throws IOException {
+                if (open) { 
+                    try { reader.close(); } 
+                    catch (IOException ignored) {} 
+                }
+                reader = open();
+                reader.beginArray();
+                open = true;
             }
+
+            private void ensureOpen() throws IOException { if (!open) reopen(); }
 
             public boolean hasNext() { return true; } // ciclico: sempre vero
 
+            // Robusto e testardo: in caso di json malformato, non si pianta.
+            // "Salta l'errore" e riprova subito dopo.
             public GameData next() {
-                ensureOpen();
-                try {
-                    if (!reader.hasNext()) { // fine file -> ricomincia
-                        reader.close();
-                        reader = open();
-                        reader.beginArray();
+                while (true) {
+                    try {
+                        ensureOpen();
+                        if (!reader.hasNext()) { 
+                            reopen(); 
+                            index = 0; 
+                        } // wrap ciclico a EOF
+                        GameData g = GSON.fromJson(reader, GameData.class);
+                        index++;
+                        return g;
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    } catch (JsonSyntaxException e) {
+                        // reader desincronizzato sul token rotto: riapri e salta oltre.
+                        System.err.println("[GameLoader] partita malformata saltata: " + e.getMessage());
+                        try {
+                            reopen();
+                            for (int i = 0; i <= index; i++) reader.skipValue(); // buoni (index) + rotto (1)
+                            index++; // riprende da quello successivo
+                        } catch (IOException io) { throw new UncheckedIOException(io); }
                     }
-                    return GSON.fromJson(reader, GameData.class);
-                } catch (IOException e) { throw new UncheckedIOException(e); }
+                }
             }
         };
     }
