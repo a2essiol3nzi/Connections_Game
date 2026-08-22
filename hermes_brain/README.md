@@ -3,63 +3,56 @@
 Progetto fine corso Reti/Lab III (A.A. 2025/26), versione specifica 1.1.
 Gioco "Connections" (NYT) implementato in **Java** con architettura **client-server**.
 
-> Stato repo al 17/08/2026: **greenfield**. Nessun `.java` presente. Solo
-> `docs/Lab3_MD/progetto_v1_1.md`, immagini, PDF e `Lab3_Progetto.zip`.
-> Il file JSON delle 911 partite (citato in §2.2 come "allegato") **manca**.
-> Vedi `status.md` → blocco S2.
+> Stato repo: **server in sviluppo** (package `server.*`). Client (C1–C4) ancora da
+> fare (P2). Vedi `status.md` per la board componenti. Il file JSON delle 911 partite
+> (~620KiB) è fornito dai docenti; in consegna va in `data/games.json`.
 
 ## Stack e vincoli tecnologici (da §3, ordinamento NUOVO)
 - Java, compilazione con `javac` (no IDE files in consegna).
 - Client: **CLI** (GUI facoltativa, non valutata).
-- **Registrazione via TCP** (no RMI — quello è vecchio ordinamento).
-- Comunicazione client↔server su **TCP persistente**, messaggi **JSON** (§5).
-- Client deve usare **NIO** per la connessione TCP.
-- Server **multithreaded con thread pooling**.
-- Strutture dati server **sincronizzate**.
-- **Vincolo sync (utente, 17/08): solo monitor + `synchronized`**. NIENTE
-  lock manuali (`java.util.concurrent.locks.Lock`/`ReentrantLock`). Consentiti:
-  `synchronized` (metodi/blocchi), `wait()`/`notify()`/`notifyAll()`, `volatile`.
-  Da confermare: `ConcurrentHashMap`/`Atomic*` (utility stdlib, non lock manuali)
-  → ammessi salvo tu voglia il rigore estremo "tutto synchronized".
-- Notifiche asincrone (es. fine partita a timeout) via **UDP**.
-- Persistenza (utenti + partite) in file **JSON**.
-- **No multicast UDP** (solo vecchio ordinamento) → notifiche UDP unicast.
-- **CONCORRENZA (vincolo utente, definitivo):** sincronizzazione SOLO con
-  `synchronized` (monitor), `wait()`/`notifyAll()` e `java.util.concurrent.
-  atomic.*`. **VIETATO** `java.util.concurrent.locks.*` (Lock/ReentrantLock/
-  ReadWriteLock/StampedLock) e lock manuali. Ammessi: `volatile`, thread pool.
-  Dettagli in `gotchas.md` §2.
-- Consegna: JAR eseguibile client + JAR eseguibile server, file di config
-  separati (client/server), NO parametri interattivi/CLI. PDF relazione ≤5 pag.
+- **Registrazione via TCP** (no RMI — vecchio ordinamento).
+- Comunicazione client↔server su **TCP persistente**, messaggi **JSON** (§5, line-based `\n`).
+- Client deve usare **NIO** per la connessione TCP; server I/O bloccante + thread pool (ammesso).
+- Strutture dati server **sincronizzate**: solo `synchronized` / `wait()`/`notifyAll()` /
+  `java.util.concurrent.atomic.*`. **VIETATI** `java.util.concurrent.locks.*`.
+- Notifiche async fine partita via **UDP** (unicast, no multicast).
+- Persistenza (utenti + **storico partite**) in file **JSON** atomici.
+- Consegna: JAR eseguibile client + JAR eseguibile server, `server.properties`/`client.properties`,
+  PDF relazione ≤5 pag, allegare `lib/gson-2.11.0.jar`.
 
 ## Build & dipendenze (stato attuale)
-- **GSON 2.11.0** scaricato in `lib/gson-2.11.0.jar` (298 KB, verificato con
-  probe di compilazione/esecuzione). NIX NON usato: jar progetto-locale, così è
-  anche già pronto per la consegna (§4 "jar allegati").
+- **GSON 2.11.0** in `lib/gson-2.11.0.jar` (jar progetto-locale, pronto per la consegna).
 - Compilazione: `javac -cp lib/gson-2.11.0.jar -d out $(find src -name '*.java')`
-- Esecuzione: `java -cp out:lib/gson-2.11.0.jar ServerMain` (e `ClientMain`)
-- JAR consegna: manifest `Main-Class` in `server.jar`/`client.jar`; allegare
-  `lib/gson-2.11.0.jar` nel pacchetto zip. Documentare classpath nel PDF.
+- Esecuzione: `java -cp out:lib/gson-2.11.0.jar server.core.ServerMain`
+- JAR: manifest `Main-Class` in `server.jar`/`client.jar`; allegare `lib/gson-2.11.0.jar`.
+
+## Package server (mappa)
+- `core/`: `ServerMain` (entry), `ServerConfig` (`.properties`), `Context` (risorse),
+  `GameManager` (logica+storico), `ActiveGame`+`PlayerState` (partita), `UserStore` (identità).
+- `loader/`: `GameLoader` (streaming pigro, `CyclicGameIterator`).
+- `model/`: `GameData` (POJO partite).
+- `network/`: `ConnectionAcceptor`, `ClientHandler`, `GameScheduler`, `UdpNotifier`.
+- `persistence/`: `PersistenceThread` (utenti+storico).
+- `protocol/`: `Errors`, `Request`, `Response`.
 
 ## Vincoli di naming (§4)
 - Classi con `main` → nome contenente `"Main"` (es. `ServerMain`, `ClientMain`).
 - Codice commentato. Librerie esterne → allegate come jar.
 
-## Decisioni lasciate all'interpretazione (DA DOCUMENTARE nella relazione PDF)
-Da definire e giustificare nel report (§4 richiede "scelte effettuate nei punti
-lasciati alla personale interpretazione"):
-1. **Metrica classifica** (cumulative score? win rate? n. vittorie?).
-2. **Durata partita** → default 10 min (citato in §2.2), da config.
-3. **Distanza tra una partita e la successiva** (subito / gap).
-4. **Password**: NON in chiaro → hash + salt (sicurezza al boundary).
-5. **Libreria JSON**: Gson/Jackson (attach jar) vs parser minimo hand-rolled.
-6. **Codici di errore** numerici/testuali per ogni operazione (§5 lascia aperto).
-7. **Sentinel "partita corrente"** nel campo `gameId` INT (es. -1).
-8. **Persistenza partita in corso** (o solo storico + utenti).
-9. **Outcome per giocatore** ∈ {WON, LOST(4 errori), NOT_FINISHED(timeout)}.
-10. **Mistake Histogram**: bin vittorie con 0-3 errori + fallite(4) + not_finished.
+## Decisioni lasciate all'interpretazione (DA DOCUMENTARE nel PDF)
+1. Metrica classifica → **cumulative score** (scelto).
+2. Durata partita → default 600s (config).
+3. Gap tra partite → **immediato** (auto-join `onlineUsers`).
+4. Password → **in chiaro** (scelta consapevole; non focalizza sicurezza).
+5. Libreria JSON → **Gson** (jar allegato).
+6. Codici errore → **testuali** centralizzati in `protocol/Errors`.
+7. Sentinel "partita corrente" → `roundId = -1` (INT). `gameId` sorgente si ripete; `roundId` monotono.
+8. Persistenza → **utenti + storico partite** (JSON separati).
+9. Outcome per giocatore ∈ {WON, LOST(4 errori), NOT_FINISHED(timeout)}.
+10. Mistake Histogram: bin vittorie 0-3 errori + fallite(4) + not_finished.
 
 ## Convenzioni adottate qui
 - Lingua: italiano (match progetto/utente).
 - File di questo brain: `README.md` (indice), `status.md` (board),
-  `protocol.md` (messaggi/errori), `gotchas.md` (insidie + dove pesa il lavoro).
+  `protocol.md` (messaggi/errori/storico), `gotchas.md` (insidie + dove pesa il lavoro).
+- Documentazione per-file speculare in `docs/explain/server/` (1 `.md` per `.java`).

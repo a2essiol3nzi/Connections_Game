@@ -8,9 +8,8 @@ import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 
 /**
- * Accetta connessioni TCP e le smista a thread del pool (thread pooling, §3).
+ * Accetta connessioni TCP e le smista a thread del pool.
  * Una connessione per client resta aperta per tutta la sessione (persistente).
- * Pacchetto `network`: comunicazione socket lato server.
  */
 public class ConnectionAcceptor implements Runnable {
 

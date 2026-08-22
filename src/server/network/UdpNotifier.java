@@ -10,11 +10,8 @@ import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
-/**
- * Invia notifiche async di fine partita ai partecipanti via UDP (§2.2, §3).
- * Unicast per partecipante (no multicast: siamo nuovo ordinamento).
- * Pacchetto `network`: comunicazione socket lato server.
- */
+// Invia notifiche async di fine partita ai partecipanti via UDP. Unicast per partecipante.
+// TODO portare a client con ip diverso da quello locale
 public class UdpNotifier {
 
     private static final Gson GSON = new Gson();
@@ -22,7 +19,7 @@ public class UdpNotifier {
 
     public UdpNotifier(int udpPort) { this.udpPort = udpPort; }
 
-    public void notifyEnd(Set<String> participants, JsonObject payload) {
+    public void notifyEnd(Set<Integer> participants, JsonObject payload) {
         byte[] data = GSON.toJson(payload).getBytes(StandardCharsets.UTF_8);
         try (DatagramSocket sock = new DatagramSocket()) {
             InetAddress addr = InetAddress.getLoopbackAddress(); // client su stessa macchina

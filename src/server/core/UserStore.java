@@ -1,4 +1,4 @@
-package server.persistence;
+package server.core;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -16,6 +16,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Objects;
+
+import server.protocol.Errors;
 
 /**
  * Store degli UTENTI: registrazione, login, aggiornamento credenziali,
@@ -91,55 +94,58 @@ public class UserStore {
     }
 
     // REGISTRAZIONE
-    // Ritorna null in caso di successo, altrimenti un codice di errore.
-    public String register(String username, String password) {
+    // Ritorna null in caso di successo, altrimenti un codice Errors.
+    public Errors register(String username, String password) {
         if (username == null || password == null || username.isBlank())
-            return "ERR_INVALID";
-        // barriera atomica PRIMA di consumare id
-        if (nameToId.putIfAbsent(username, -1) != null) // -1 solo placeholder
-            return "ERR_USERNAME_TAKEN";
-        User u = new User(nextId.getAndIncrement());
-        u.username = username; u.password = password;
-        nameToId.put(username, u.id);
-        byId.put(u.id, u);
+            return Errors.ERR_INVALID;
+        synchronized (this) {
+            if (nameToId.containsKey(username))
+                return Errors.ERR_USERNAME_TAKEN;
+            User u = new User(nextId.getAndIncrement());
+            u.username = username; u.password = password;
+            nameToId.put(username, u.id);
+            byId.put(u.id, u);
+        }
         return null;
     }
 
     // LOGIN
-    // Risolve l'id, prende l'User, controlla la password sotto synchronized(u).
-    // Ritorna null in caso di successo, altrimenti un codice di errore.
-    public String login(String username, String password) {
-        Integer id = nameToId.get(username);
-        if (id == null) 
-            return "ERR_USER_NOT_FOUND";
-        User u = byId.get(id);
+    // Ritorna null in caso di successo, altrimenti un codice Errors.
+    public Errors login(String username, String password) {
+        User u;
+        synchronized (this) {
+            Integer id = nameToId.get(username);
+            u = id == null ? null : byId.get(id);
+        }
+        if (u == null) return Errors.ERR_USER_NOT_FOUND;
         synchronized (u) {
-            if (!password.equals(u.password))
-                return "ERR_WRONG_PASSWORD";
+            if (!Objects.equals(password, u.password)) return Errors.ERR_WRONG_PASSWORD;
         }
         return null; // OK
     }
 
     // AGGIORNAMENTO CREDENZIALI
     // oldPsw obbligatoria; newUsername e/o newPsw opzionali.
-    // Ritorna null in caso di successo, altrimenti un codice di errore.
-    public String updateCredentials(String oldUsername, String oldPsw,
+    // Ritorna null in caso di successo, altrimenti un codice Errors.
+    public Errors updateCredentials(String oldUsername, String oldPsw,
                                     String newUsername, String newPsw) {
-        Integer id = nameToId.get(oldUsername);
-        if (id == null) 
-            return "ERR_USER_NOT_FOUND";
-        User u = byId.get(id);
-        synchronized (u) {
-            if (!oldPsw.equals(u.password))
-                return "ERR_WRONG_PASSWORD";
-            if (newPsw != null) 
-                u.password = newPsw;
-            if ((newUsername != null) && (!newUsername.equals(oldUsername))) {
-                // rinomina: solo l'INDICE secondario cambia; byId resta invariato.
-                if (nameToId.putIfAbsent(newUsername, id) != null)
-                    return "ERR_USERNAME_TAKEN";
-                nameToId.remove(oldUsername);
-                u.username = newUsername;
+        synchronized (this) {
+            Integer id = nameToId.get(oldUsername);
+            if (id == null) 
+                return Errors.ERR_USER_NOT_FOUND;
+            User u = byId.get(id);
+            synchronized (u) {
+                if (!Objects.equals(oldPsw, u.password)) 
+                    return Errors.ERR_WRONG_PASSWORD;
+                if (newPsw != null) 
+                    u.password = newPsw;
+                if ((newUsername != null) && (!newUsername.equals(oldUsername))) {
+                    // rinomina: solo l'INDICE secondario cambia; byId resta invariato.
+                    if (nameToId.putIfAbsent(newUsername, id) != null) 
+                        return Errors.ERR_USERNAME_TAKEN;
+                    nameToId.remove(oldUsername);
+                    u.username = newUsername;
+                }
             }
         }
         return null; // OK
@@ -155,11 +161,20 @@ public class UserStore {
         return nameToId.containsKey(username);
     }
 
-    // Lookup per nome -> User (o null).
+    // Lookup per nome -> User (o null). Risoluzione atomica sotto il lock dello store.
     public User getByName(String username) {
-        Integer id = nameToId.get(username);
-        return id == null ? null : byId.get(id);
+        synchronized (this) {
+            Integer id = nameToId.get(username);
+            return id == null ? null : byId.get(id);
+        }
     }
+
+    // Lookup per id immutabile -> User (o null). L'id non cambia MAI, quindi questa
+    // risoluzione resta valida anche se l'utente rinomina le proprie credenziali.
+    public User getById(int id) {
+        return byId.get(id);
+    }
+
 
     // PERSISTENZA (snapshot JSON atomico)
     // synchronized: timer (PersistenceThread), scheduler (post-finalize) e
@@ -168,23 +183,25 @@ public class UserStore {
     public synchronized void persist() throws IOException {
         JsonArray arr = new JsonArray();
         for (User u : byId.values()) {
-            JsonObject o = new JsonObject();
-            o.addProperty("id", u.id);
-            o.addProperty("username", u.username);
-            o.addProperty("password", u.password);
-            o.addProperty("cumulativeScore", u.cumulativeScore);
-            o.addProperty("puzzlesPlayed", u.puzzlesPlayed);
-            o.addProperty("puzzlesWon", u.puzzlesWon);
-            o.addProperty("puzzlesLost", u.puzzlesLost);
-            o.addProperty("notFinished", u.notFinished);
-            o.addProperty("currentStreak", u.currentStreak);
-            o.addProperty("maxStreak", u.maxStreak);
-            o.addProperty("perfectPuzzles", u.perfectPuzzles);
-            JsonArray m = new JsonArray();
-            for (int x : u.mistakeHist) 
-                m.add(x);
-            o.add("mistakeHist", m);
-            arr.add(o);
+            synchronized (u) {
+                JsonObject o = new JsonObject();
+                o.addProperty("id", u.id);
+                o.addProperty("username", u.username);
+                o.addProperty("password", u.password);
+                o.addProperty("cumulativeScore", u.cumulativeScore);
+                o.addProperty("puzzlesPlayed", u.puzzlesPlayed);
+                o.addProperty("puzzlesWon", u.puzzlesWon);
+                o.addProperty("puzzlesLost", u.puzzlesLost);
+                o.addProperty("notFinished", u.notFinished);
+                o.addProperty("currentStreak", u.currentStreak);
+                o.addProperty("maxStreak", u.maxStreak);
+                o.addProperty("perfectPuzzles", u.perfectPuzzles);
+                JsonArray m = new JsonArray();
+                for (int x : u.mistakeHist) 
+                    m.add(x);
+                o.add("mistakeHist", m);
+                arr.add(o);
+            }
         }
         Path p = Path.of(persistFile);
         if (p.getParent() != null) 
@@ -196,7 +213,7 @@ public class UserStore {
         Files.move(tmp, p, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }
 
-    // CARICAMENTO (all'avvio)
+    // CARICAMENTO (all'avvio), esecuzione single threaded.
     // File utenti leggibile interamente. Ripristina id e nextId.
     private void load() {
         Path p = Path.of(persistFile);

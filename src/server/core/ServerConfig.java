@@ -14,6 +14,7 @@ public class ServerConfig {
     public final int persistIntervalSec;
     public final String gamesFile;
     public final String persistFile;
+    public final String historyFile;
 
     private ServerConfig(Properties p) {
         tcpPort = Integer.parseInt(p.getProperty("tcp.port", "12345"));
@@ -23,6 +24,7 @@ public class ServerConfig {
         persistIntervalSec = Integer.parseInt(p.getProperty("persist.interval.sec", "30"));
         gamesFile = p.getProperty("games.file", "data/games.json");
         persistFile = p.getProperty("persist.file", "data/users.json");
+        historyFile = p.getProperty("history.file", "data/history.json");
     }
 
     public static ServerConfig load(String path) throws IOException {

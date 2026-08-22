@@ -1,6 +1,7 @@
 package server.core;
 
 import server.model.GameData;
+import server.protocol.Errors;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -9,115 +10,194 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.Random;
 
 /**
  * Partita ATTIVA (unica, globale). Gestisce valutazione proposte e stato per giocatore.
- * Parole inviate MESCOLANO; i "theme" restano lato server (mai al client).
  *
- * Concorrenza: mutazioni su `this` tramite metodi synchronized (vincolo NO locks).
- * # ponytail: synchronized su ActiveGame copre valutazione + swap; ristringere
- * la sezione critica solo se il throughput reale lo richiede.
+ * Concorrenza: Il flag `finalized` (AtomicBoolean) segnala che la partita è stata conclusa
+ * dallo scheduler: submit/join lo leggono e rifiutano ulteriori azioni, chiudendo
+ * la corsa tra la lettura di `current()` e la mutazione della partita.
  */
 public class ActiveGame {
 
-    public final int gameId;
+    public final int gameId;        // id sorgente (si ripete al wrap del loader ciclico)
+    public final int roundId;       // id UNIVOCO di questa esecuzione (monotono)
     public final long startTimeMs;
     public final long endTimeMs;
-    private final List<Group> groups;          // 4 gruppi, con parole + tema nascosto
+    private final List<ThemeGroup> groups;     // 4 gruppi, con parole + tema nascosto
     public final List<String> shuffledWords;   // 16 parole in ordine casuale (al client)
 
-    private final Map<String, PlayerState> players = new ConcurrentHashMap<>();
+    // true dopo che lo scheduler ha finalizzato la partita.
+    public final AtomicBoolean finalized = new AtomicBoolean(false);
 
-    private static final class Group {
+    // userId -> PlayerState
+    private final Map<Integer, PlayerState> players = new ConcurrentHashMap<>();
+
+    // Struttura di RUNTIME interna: parole in Set<String> per match senza ordine in submit().
+    // Distinta da GameData.Group.
+    private static final class ThemeGroup {
         final String theme;
         final Set<String> words;
-        Group(String theme, Set<String> words) { this.theme = theme; this.words = words; }
+
+        ThemeGroup(String theme, Set<String> words) { this.theme = theme; this.words = words; }
     }
 
-    public ActiveGame(GameData src, long nowMs, long durationMs, Random rnd) {
+    public ActiveGame(GameData src, long nowMs, long durationMs, Random rnd, int roundId) {
         this.gameId = src.gameId;
+        this.roundId = roundId;
         this.startTimeMs = nowMs;
         this.endTimeMs = nowMs + durationMs;
         this.groups = new ArrayList<>();
         List<String> all = new ArrayList<>();
         for (GameData.Group g : src.groups) {
-            groups.add(new Group(g.theme, new HashSet<>(g.words)));
+            groups.add(new ThemeGroup(g.theme, new HashSet<>(g.words)));
             all.addAll(g.words);
         }
         Collections.shuffle(all, rnd);
         this.shuffledWords = Collections.unmodifiableList(all);
     }
 
-    public synchronized void join(String username) {
-        players.computeIfAbsent(username, PlayerState::new);
+    // Partecipazione alla partita.
+    public synchronized JoinResult join(int userId) {
+        if (finalized.get())
+            return JoinResult.ERR_FINISHED;
+        players.computeIfAbsent(userId, PlayerState::new);
+        return JoinResult.OK;
     }
 
-    public synchronized PlayerState getState(String username) {
-        return players.get(username);
+    /**
+     * Esito di una partecipazione. Un'unica sorgente per i codici emessi da 
+     * join e consumati dal GameManager.
+     * `isOk()` distingue successo/errore senza letterali sparsi.
+     */
+    public enum JoinResult {
+        OK(null, null),
+        ERR_FINISHED(null, Errors.ERR_GAME_OVER_FOR_YOU),
+        ERR_NO_ACTIVE_GAME(null, Errors.ERR_NO_ACTIVE_GAME);
+
+        final String result;  // etichetta esito OK (qui sempre null: join non ha payload)
+        final Errors error;    // codice wire (brain §5); null sui successi
+
+        JoinResult(String result, Errors error) { this.result = result; this.error = error; }
+        
+        public boolean isOk() { return error == null; }
+        public String resultLabel() { return result; }
+        public Errors error() { return error; }
     }
 
-    public synchronized Set<String> participants() {
+    public PlayerState getState(int userId) {
+        return players.get(userId);
+    }
+
+    public Set<Integer> participants() {
         return new HashSet<>(players.keySet());
     }
 
     /**
-     * Valuta una proposta di 4 parole per un utente.
-     *   "OK_FOUND"      gruppo corretto (nuovo) → +1 corretto
-     *   "OK_WRONG"      parole valide ma gruppo errato → +1 errore
-     *   "ERR_MALFORMED" parole non valide / già trovate / non 4 distinte → nessun impatto
-     *   "ERR_FINISHED" utente ha già finito → nessun impatto
-     *   "ERR_NOTJOINED" utente non partecipa → nessun impatto
+     * Esito di una proposta: un'unica sorgente per i codici emessi da submit
+     * e consumati dal ClientHandler. Ogni costante porta l'etichetta `result` (solo
+     * sui successi, es. "CORRECT") e il codice wire `error` (solo sugli errori, da
+     * Errors). `isOk()` distingue successo/errore senza letterali sparsi.
      */
-    public synchronized String submit(String username, List<String> words) {
-        PlayerState ps = players.get(username);
-        if (ps == null) return "ERR_NOTJOINED";
-        if (ps.finished) return "ERR_FINISHED";
+    public enum SubmitResult {
+        OK_FOUND("CORRECT", null),
+        OK_WRONG("WRONG", null),
+        ERR_MALFORMED(null, Errors.ERR_MALFORMED),
+        ERR_FINISHED(null, Errors.ERR_GAME_OVER_FOR_YOU),
+        ERR_NOTJOINED(null, Errors.ERR_NOT_JOINED),
+        ERR_NO_ACTIVE_GAME(null, Errors.ERR_NO_ACTIVE_GAME);
 
-        // 1) validità formale (MALFORMED se fallisce → nessun impatto stato)
-        if (words == null || words.size() != 4) return "ERR_MALFORMED";
+        final String result;  // etichetta esito OK ("CORRECT"/"WRONG"), null sugli errori
+        final Errors error;    // codice errore; null sui successi
+
+        SubmitResult(String result, Errors error) { this.result = result; this.error = error; }
+        
+        public boolean isOk() { return error == null; }
+        public String resultLabel() { return result; }
+        public Errors error() { return error; }
+    }
+
+    /**
+     * Valuta una proposta di 4 parole per un utente.
+     *   OK_FOUND      gruppo corretto (nuovo) -> +1 corretto
+     *   OK_WRONG      parole valide ma gruppo errato -> +1 errore
+     *   ERR_MALFORMED parole non valide / gia trovate / non 4 distinte -> nessun impatto
+     *   ERR_FINISHED utente ha gia finito (o partita conclusa) -> nessun impatto
+     *   ERR_NOTJOINED utente non partecipa -> nessun impatto
+     */
+    public synchronized SubmitResult submit(int userId, List<String> words) {
+        if (finalized.get()) 
+            return SubmitResult.ERR_FINISHED;
+        PlayerState ps = players.get(userId);
+        if (ps == null) 
+            return SubmitResult.ERR_NOTJOINED;
+        if (ps.finished) 
+            return SubmitResult.ERR_FINISHED;
+
+        // validità formale (MALFORMED se fallisce -> nessun impatto stato)
+        if (words == null || words.size() != 4) 
+            return SubmitResult.ERR_MALFORMED;
         Set<String> proposed = new HashSet<>(words);
-        if (proposed.size() != 4) return "ERR_MALFORMED";              // duplicati
+        if (proposed.size() != 4) 
+            return SubmitResult.ERR_MALFORMED;    // duplicati
         for (String w : proposed)
-            if (!shuffledWords.contains(w)) return "ERR_MALFORMED";    // parola fuori gioco
-        // parola già in un gruppo trovato → MALFORMED (non errore)
+            if (!shuffledWords.contains(w)) 
+                return SubmitResult.ERR_MALFORMED;  // parola fuori gioco
+        // parola già in un gruppo trovato -> MALFORMED (non errore)
         for (int gi : ps.foundGroups)
-            if (proposed.containsAll(groups.get(gi).words)) return "ERR_MALFORMED";
-
-        // 2) correttezza gruppo
+            if (proposed.containsAll(groups.get(gi).words)) 
+                return SubmitResult.ERR_MALFORMED;
+        // correttezza gruppo
         for (int gi = 0; gi < groups.size(); gi++) {
             if (proposed.equals(groups.get(gi).words)) {
-                if (!ps.foundGroups.contains(gi)) {
+                if (!ps.foundGroups.contains(gi)) { // gruppo nuovo e corretto
                     ps.foundGroups.add(gi);
                     ps.correctCount++;
-                    if (ps.correctCount >= 3) ps.finished = true;
-                    return "OK_FOUND";
+                    if (ps.correctCount >= 3) 
+                        ps.finished = true; // vittoria!
+                    return SubmitResult.OK_FOUND;
                 } else {
-                    return "ERR_MALFORMED"; // già trovato questo gruppo
+                    return SubmitResult.ERR_MALFORMED; // corretto ma già trovato
                 }
             }
         }
-        // 3) nessun gruppo coincide → ERRATA (conta come errore)
+        // nessun gruppo coincide -> ERRATA (conta come errore)
         ps.errorCount++;
-        if (ps.errorCount >= 4) ps.finished = true;
-        return "OK_WRONG";
+        if (ps.errorCount >= 4) 
+            ps.finished = true; // sconfitta!
+        return SubmitResult.OK_WRONG;
     }
 
-    /** Parole dei gruppi già individuati dal giocatore (calcolo "remaining"). */
-    public synchronized List<String> wordsOfFoundGroups(PlayerState ps) {
-        List<String> out = new ArrayList<>();
-        for (int gi : ps.foundGroups) out.addAll(groups.get(gi).words);
+    // Assignment completo (tema + parole); per lo storico (riusa GameData.Group).
+    public synchronized GameData.Group[] groupInfo() {
+        GameData.Group[] out = new GameData.Group[groups.size()]; // 4 gruppi
+        for (int i = 0; i < groups.size(); i++) {
+            ThemeGroup g = groups.get(i);
+            GameData.Group gi = new GameData.Group();
+            gi.theme = g.theme;
+            gi.words = new ArrayList<>(g.words); // Set -> List (forma JSON condivisa)
+            out[i] = gi;
+        }
         return out;
     }
 
-    public synchronized boolean isExpired(long nowMs) {
-        return nowMs >= endTimeMs;
+    // Parole dei gruppi già individuati dal giocatore (calcolo "remaining").
+    public synchronized List<String> wordsOfFoundGroups(PlayerState ps) {
+        List<String> out = new ArrayList<>();
+        for (int gi : ps.foundGroups) 
+            out.addAll(groups.get(gi).words);
+        return out;
     }
 
     public enum Outcome { WON, LOST, NOT_FINISHED }
+    
     public synchronized Outcome outcomeOf(PlayerState ps) {
-        if (ps.correctCount >= 3) return Outcome.WON;
-        if (ps.errorCount >= 4) return Outcome.LOST;
+        if (ps.correctCount >= 3) 
+            return Outcome.WON;
+        if (ps.errorCount >= 4) 
+            return Outcome.LOST;
         return Outcome.NOT_FINISHED;
     }
 }

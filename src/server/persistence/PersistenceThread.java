@@ -1,17 +1,18 @@
 package server.persistence;
 
-/**
- * Thread di persistenza periodica: salva UserStore su JSON a intervalli
- * (§2.2: persistenza periodica consistente per riavvio).
- * Pacchetto `persistence`: tutto ciò che riguarda salvare/caricare lo stato.
- */
+import server.core.GameManager;
+import server.core.UserStore;
+
+// Thread di persistenza periodica: salva dati importanti su JSON a intervalli.
 public class PersistenceThread implements Runnable {
 
     private final UserStore users;
+    private final GameManager games;
     private final int intervalSec;
 
-    public PersistenceThread(UserStore users, int intervalSec) {
+    public PersistenceThread(UserStore users, GameManager games, int intervalSec) {
         this.users = users;
+        this.games = games;
         this.intervalSec = intervalSec;
     }
 
@@ -21,7 +22,8 @@ public class PersistenceThread implements Runnable {
             try {
                 Thread.sleep(intervalSec * 1000L);
                 users.persist();
-                System.out.println("[Persist] users saved");
+                games.persistHistory();
+                System.out.println("[Persist] users + history saved");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;

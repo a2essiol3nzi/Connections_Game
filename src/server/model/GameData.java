@@ -3,7 +3,7 @@ package server.model;
 import java.util.List;
 
 /**
- * Classe POJO semplice per JSON delle partite (schema CONFERMATO, array top-level):
+ * Classe POJO semplice per JSON delle partite:
  * [ { "gameId": 0, "groups": [ {"theme": "...", "words":[4]}, ... ] }, ... ]
  * Il campo "theme" (la categoria nascosta) NON viene mai inviata al client.
  */

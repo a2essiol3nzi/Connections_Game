@@ -1,228 +1,380 @@
 package server.core;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import server.loader.GameLoader;
-import server.model.GameData;
-import server.persistence.UserStore;
-import server.protocol.Errors;
+import com.google.gson.reflect.TypeToken;
+import com.google.gson.JsonIOException;
 
+import server.loader.GameLoader;
+import server.loader.GameLoader.CyclicGameIterator;
+import server.model.GameData;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Random;
 
 /**
  * GameManager: cuore della LOGICA DI GIOCO lato server.
  *
- * Il caricatore delle partite è PIGRO: le partite NON stanno tutte in RAM.
- * GameManager tiene quindi solo l'UNICA partita attiva e, a ogni rotazione,
- * ne chiede UNA al loader tramite `gameAt(indice casuale)`.
+ * GameManager tiene l'UNICA partita attiva e, a ogni rotazione,
+ * ne chiede UNA ALLA VOLTA all'iteratore ciclico del loader.
  *
  * Responsabilità:
- *   • mantenere l'ActiveGame corrente e ruotarlo allo scadere;
- *   • esporre le operazioni richieste dal ClientHandler
+ *   - mantenere l'ActiveGame corrente e ruotarlo allo scadere, re-iscrivendo
+ *     automaticamente gli utenti online;
+ *   - esporre le operazioni richieste dal ClientHandler
  *     (join, submitProposal, info/stats partita, classifica, stats utente);
- *   • registrare gli esiti a fine partita e aggiornare le statistiche utente.
+ *   - registrare gli esiti a fine partita in uno storico PERSISTITO e aggiornare
+ *     le statistiche utente (UserStore).
  *
- * Concorrenza: lo swap di `current` è in metodi synchronized (vincolo: NO
- * java.util.concurrent.locks.*). La valutazione è delegata ad ActiveGame
- * (a sua volta synchronized). Lo storico è in ConcurrentHashMap.
+ * Concorrenza: lo swap di `current` è in metodi synchronized. La valutazione è
+ * delegata ad ActiveGame (synchronized); `finalized` è AtomicBoolean per visibilità
+ * cross-thread e set atomico. Lo storico è in ConcurrentHashMap; onlineUsers è un
+ * ConcurrentHashMap-backed set.
  */
 public class GameManager {
+
+    private static final Gson GSON = new GsonBuilder().create();
+    private static final int HISTORY_CAP = 1000;
 
     private final GameLoader loader;          // sorgente partite PIGRO
     private final int durationSec;           // durata partita (da config)
     private final Random rnd = new Random();
-    private final Iterator<GameData> games;  // iteratore ciclico sul loader pigro
+    private final CyclicGameIterator games;  // iteratore ciclico sul loader pigro
 
     // Partita globale attiva (null solo se il loader è vuoto).
     private ActiveGame current;
-    // Storico partite CONCLUSE: gameId -> (username -> esito/score).
+    // Storico partite CONCLUSE: roundId -> (groups con tema + userId -> esito/score).
     private final Map<Integer, GameHistory> history = new ConcurrentHashMap<>();
+    // Utenti attualmente loggati (per auto-join).
+    private final Set<Integer> onlineUsers = ConcurrentHashMap.newKeySet();
+    // Id univoco e monotono di ogni esecuzione (non si ripete al ciclo del loader).
+    private final AtomicInteger nextRoundId = new AtomicInteger(1);
+
+    private final String historyFile;
 
     private static final class GameHistory {
-        final Map<String, HistoryEntry> entries = new ConcurrentHashMap<>();
+        public int roundId;
+        public int sourceGameId;
+        public GameData.Group[] groups = new GameData.Group[4]; // 4 gruppi x 4 parole + tema (riusa DTO input)
+        public Map<Integer, HistoryEntry> entries = new ConcurrentHashMap<>(); // chiave = userId immutabile
     }
+
     public static final class HistoryEntry {
         public int correct, errors, score;
         public String outcome; // WON | LOST | NOT_FINISHED
     }
 
-    public GameManager(GameLoader loader, int durationSec) {
+    public GameManager(GameLoader loader, int durationSec, String historyFile) {
         this.loader = loader;
         this.durationSec = durationSec;
+        this.historyFile = historyFile;
         this.games = loader.cyclicIterator();
+        loadHistory();
         this.current = makeNext(System.currentTimeMillis());
     }
 
-    /** Costruisce la prossima partita: ciclo sul loader pigro. */
+    /* Costruisce la prossima partita: delega al loader pigro.
+     * GameLoader.next() ingoia da solo i giochi malformati (JsonSyntaxException
+     * gestita internamente con skip + wrap ciclico) e lancia SOLO eccezioni da
+     * I/O, normalizzate in UncheckedIOException (reader) o JsonIOException (Gson).
+     * Su I/O reale torniamo null -> lo scheduler ritenta. Nessun loop/retry qui:
+     * il loader gia' avanza e fa wrap, quindi next() torna sempre o lancia I/O. 
+     */
     private ActiveGame makeNext(long nowMs) {
-        if (loader.total() == 0) return null;
+        if (loader.total() == 0)
+            return null;
         try {
             GameData src = games.next();
-            return new ActiveGame(src, nowMs, durationSec * 1000L, rnd);
-        } catch (Exception e) {
-            System.err.println("[GameManager] caricamento partita fallito: " + e.getMessage());
+            return new ActiveGame(src, nowMs, durationSec * 1000L, rnd, nextRoundId.getAndIncrement());
+        } catch (UncheckedIOException | JsonIOException e) {
+            System.err.println("[GameManager] loader I/O error (fatale): " + e.getMessage());
             return null;
         }
     }
 
     public synchronized ActiveGame current() { return current; }
 
-    /** Lo scheduler chiama questo allo scadere della partita corrente. */
-    public synchronized void rotate(long nowMs) { current = makeNext(nowMs); }
-
-    // ---- OPERAZIONI ESPOSTE AL CLIENTHANDLER ----
-
-    public Errors join(String username) {
-        ActiveGame g = current();
-        if (g == null) return Errors.ERR_NO_ACTIVE_GAME;
-        g.join(username);
-        return null; // null = OK
+    // Lo scheduler chiama questo allo scadere della partita corrente.
+    public synchronized void rotate(long nowMs) {
+        current = makeNext(nowMs);
+        if (current == null) 
+            return;
+        // Auto-join di tutti gli utenti online.
+        for (int u : new ArrayList<>(onlineUsers))
+            current.join(u);
     }
 
-    public String submitProposal(String username, List<String> words) {
-        ActiveGame g = current();
-        if (g == null) return Errors.ERR_NO_ACTIVE_GAME.name();
-        return g.submit(username, words);
+    // True se l'utente è attualmente nel registry online (login senza logout).
+    public boolean isOnline(int userId) {
+        return onlineUsers.contains(userId);
     }
 
-    public JsonObject gameInfo(String username, int gameId) {
-        ActiveGame g = (gameId == -1) ? current() : null; // -1 = corrente
+    // Registra un login: entra nel registry online e si unisce alla partita corrente.
+    public void registerLogin(int userId) {
+        onlineUsers.add(userId);
+        ActiveGame g = current();
+        if (g != null)
+            g.join(userId);
+    }
+
+    // Registra un logout/disconnessione: rimuove l'utente dal registry online.
+    public void registerLogout(int userId) {
+        onlineUsers.remove(userId);
+    }
+
+    // Tentativo di partecipazione alla partita corrente. Ritorna un
+    // ActiveGame.JoinResult (enum).
+    public ActiveGame.JoinResult join(int userId) {
+        ActiveGame g = current();
+        if (g == null)
+            return ActiveGame.JoinResult.ERR_NO_ACTIVE_GAME;
+        return g.join(userId);
+    }
+
+    // Valuta una proposta. Ritorna un ActiveGame.SubmitResult (enum).
+    public ActiveGame.SubmitResult submitProposal(int userId, List<String> words) {
+        ActiveGame g = current();
+        if (g == null)
+            return ActiveGame.SubmitResult.ERR_NO_ACTIVE_GAME;
+        return g.submit(userId, words);
+    }
+
+    /**
+     * Info partita:
+     *   roundId == -1 -> partita CORRENTE (live): id, tempo rimanente, stato del
+     *                    giocatore richiesto, parole rimaste.
+     *   roundId != -1 -> partita CONCLUSA (storico): assignment corretto (16->4,
+     *                    tema incluso) + correct/errors/score del giocatore.
+     */
+    public JsonObject gameInfo(int userId, int roundId, UserStore store) {
         JsonObject o = new JsonObject();
-        if (g == null) { o.addProperty("errorCode", Errors.ERR_GAME_NOT_FOUND.name()); return o; }
-        o.addProperty("gameId", g.gameId);
-        long remain = Math.max(0, (g.endTimeMs - System.currentTimeMillis()) / 1000);
-        o.addProperty("remainingSec", remain);
-        PlayerState ps = g.getState(username);
-        if (ps != null) {
-            o.addProperty("correct", ps.correctCount);
-            o.addProperty("errors", ps.errorCount);
-            o.addProperty("score", ps.score());
-            o.addProperty("finished", ps.finished);
-            List<String> remaining = new ArrayList<>(g.shuffledWords);
-            for (String w : g.wordsOfFoundGroups(ps)) remaining.remove(w);
-            JsonArray rem = new JsonArray();
-            for (String w : remaining) rem.add(w);
-            o.add("remainingWords", rem);
+        if (roundId == -1) {
+            ActiveGame g = current();
+            if (g == null) 
+                return null; // -> ERR_NO_ACTIVE_GAME (handler)
+            o.addProperty("gameId", g.roundId);
+            o.addProperty("sourceGameId", g.gameId);
+            long remain = Math.max(0, (g.endTimeMs - System.currentTimeMillis()) / 1000);
+            o.addProperty("remainingSec", remain);
+            synchronized (g) {
+                PlayerState ps = g.getState(userId);
+                if (ps != null) {
+                    o.addProperty("correct", ps.correctCount);
+                    o.addProperty("errors", ps.errorCount);
+                    o.addProperty("score", ps.score());
+                    o.addProperty("finished", ps.finished);
+                    List<String> remaining = new ArrayList<>(g.shuffledWords);
+                    for (String w : g.wordsOfFoundGroups(ps)) 
+                        remaining.remove(w);
+                    JsonArray rem = new JsonArray();
+                    for (String w : remaining) 
+                        rem.add(w);
+                    o.add("remainingWords", rem);
+                }
+            }
+            return o;
+        }
+        // storico
+        GameHistory h = history.get(roundId);
+        if (h == null) 
+            return null; // -> ERR_GAME_NOT_FOUND (handler)
+        o.addProperty("gameId", h.roundId);
+        o.addProperty("sourceGameId", h.sourceGameId);
+        o.addProperty("finished", true);
+        JsonArray groups = new JsonArray();
+        for (GameData.Group grp : h.groups) {
+            JsonObject g = new JsonObject();
+            g.addProperty("theme", grp.theme);
+            JsonArray ws = new JsonArray();
+            for (String w : grp.words) 
+                ws.add(w);
+            g.add("words", ws);
+            groups.add(g);
+        }
+        o.add("assignment", groups);
+        // risoluzione per id immutabile (chiave dello storico): lo userId non
+        // cambia alla rinomina, quindi la richiesta resta valida anche dopo rename.
+        UserStore.User u = store.getById(userId);
+        if (u == null) 
+            return null; // -> ERR_GAME_NOT_FOUND (handler)
+        HistoryEntry he = h.entries.get(u.id);
+        if (he != null) {
+            o.addProperty("correct", he.correct);
+            o.addProperty("errors", he.errors);
+            o.addProperty("score", he.score);
+            o.addProperty("outcome", he.outcome);
         }
         return o;
     }
 
     /**
      * Statistiche aggregate della partita.
-     *   - partita in corso (gameId==-1): conteggi LIVE (in corso / finiti / vinti).
-     *   - partita storica (gameId!=-1): da `history` (partecipanti, vinti, media).
+     *   roundId == -1 -> partita in corso: conteggi LIVE (in corso / finiti / vinti).
+     *   roundId != -1 -> da `history` (partecipanti, vinti, media).
      */
-    public JsonObject gameStats(int gameId) {
-        ActiveGame g = (gameId == -1) ? current() : null;
+    public JsonObject gameStats(int roundId) {
         JsonObject o = new JsonObject();
-        if (g == null && gameId == -1) {
-            o.addProperty("errorCode", Errors.ERR_GAME_NOT_FOUND.name());
-            return o;
-        }
-        if (g != null) {
+        if (roundId == -1) {
+            ActiveGame g = current();
+            if (g == null) 
+                return null; // -> ERR_GAME_NOT_FOUND (handler)
             int inProgress = 0, finished = 0, won = 0;
-            for (String u : g.participants()) {
-                PlayerState ps = g.getState(u);
-                if (ps.finished) { finished++; if (ps.correctCount >= 3) won++; }
-                else inProgress++;
+            synchronized (g) { // stessa ragione di gameInfo: evita lettura di PlayerState fuori lock
+                Set<Integer> parts = g.participants();
+                for (int u : parts) {
+                    PlayerState ps = g.getState(u);
+                    if (ps.finished) { 
+                        finished++; 
+                        if (ps.correctCount >= 3) 
+                            won++; 
+                    }
+                    else inProgress++;
+                }
+                o.addProperty("participantsTotal", parts.size());
             }
-            o.addProperty("participantsTotal", g.participants().size());
             o.addProperty("inProgress", inProgress);
             o.addProperty("finished", finished);
             o.addProperty("won", won);
-        } else {
-            // storica: leggo lo storico
-            GameHistory h = history.get(gameId);
-            if (h != null) {
-                int sum = 0, cnt = 0, w = 0;
-                for (HistoryEntry e : h.entries.values()) {
-                    sum += e.score; cnt++;
-                    if ("WON".equals(e.outcome)) w++;
-                }
-                o.addProperty("participantsTotal", cnt);
-                o.addProperty("finished", cnt);
-                o.addProperty("won", w);
-                o.addProperty("avgScore", cnt == 0 ? 0 : sum / cnt);
-            } else {
-                o.addProperty("errorCode", Errors.ERR_GAME_NOT_FOUND.name());
-            }
+            return o;
         }
+        // storico
+        GameHistory h = history.get(roundId);
+        if (h == null) 
+            return null; // -> ERR_GAME_NOT_FOUND (handler)
+        int sum = 0, cnt = 0, w = 0;
+        for (HistoryEntry e : h.entries.values()) {
+            sum += e.score; cnt++;
+            if ("WON".equals(e.outcome))
+                w++;
+        }
+        o.addProperty("participantsTotal", cnt);
+        o.addProperty("finished", cnt);
+        o.addProperty("won", w);
+        o.addProperty("avgScore", cnt == 0 ? 0 : sum / cnt);
         return o;
     }
 
-    /** Classifica: utenti (o top-K) per punteggio cumulativo; opz. rango di uno. */
+    // Classifica: utenti per punteggio cumulativo; opz. rango di uno. Rank sulla lista COMPLETA.
+    // Snapshot sotto lock per utente (paired col writer in finalizeGame), poi ordinamento
+    // fuori lock: evita di leggere cumulativeScore in una finestra di race.
     public JsonObject leaderboard(String playerName, Integer topK, UserStore store) {
         JsonObject o = new JsonObject();
         JsonArray arr = new JsonArray();
         List<UserStore.User> all = new ArrayList<>(store.allUsers());
-        all.sort((a, b) -> Integer.compare(b.cumulativeScore, a.cumulativeScore));
-        if (topK != null) all = new ArrayList<>(all.subList(0, Math.min(topK, all.size())));
-        for (UserStore.User u : all) {
+        // List<[id, score]>; username recuperato dopo l'ordinamento via getById.
+        List<int[]> rows = new ArrayList<>();
+        // Risoluzione UNICA nome->id (getByName e' synchronized su nameToId). Se l'utente
+        // si rinomina, qui prendiamo l'id corrente e confrontiamo per id, non per username:
+        // cosi' il rank resta coerente anche a cavallo di una updateCredentials.
+        int targetId = -1;
+        if (playerName != null) {
+            UserStore.User t = store.getByName(playerName);
+            if (t != null) targetId = t.id;
+        }
+        int rank = -1;
+        for (int i = 0; i < all.size(); i++) {
+            UserStore.User u = all.get(i);
+            synchronized (u) {
+                if (u.id == targetId) rank = rows.size() + 1;
+                rows.add(new int[]{ u.id, u.cumulativeScore });
+            }
+        }
+        rows.sort((a, b) -> Integer.compare(b[1], a[1]));
+        int lim = (topK != null) ? Math.min(topK, rows.size()) : rows.size();
+        for (int i = 0; i < lim; i++) {
+            int[] r = rows.get(i);
+            UserStore.User u = store.getById(r[0]);
             JsonObject e = new JsonObject();
-            e.addProperty("username", u.username);
-            e.addProperty("cumulativeScore", u.cumulativeScore);
+            e.addProperty("username", u == null ? "" : u.username);
+            e.addProperty("cumulativeScore", r[1]);
             arr.add(e);
         }
         o.add("leaderboard", arr);
         if (playerName != null) {
-            int pos = 1;
-            for (UserStore.User u : all) {
-                if (u.username.equals(playerName)) break;
-                pos++;
-            }
-            o.addProperty("playerRank", store.hasUser(playerName) ? pos : -1);
+            if (targetId == -1) return null; // -> ERR_PLAYER_NOT_FOUND (handler)
+            o.addProperty("playerRank", rank);
         }
         return o;
     }
 
-    /** Statistiche personali NYT-style (§2.1). */
-    public JsonObject playerStats(String username, UserStore store) {
-        UserStore.User u = store.getByName(username);
+    // Statistiche personali NYT-style. Identificazione per userId immutabile
+    // (importante: una rinomina durante la partita non ne invalida l'accesso).
+    // Ritorna null se l'utente non esiste (-> ERR_USER_NOT_FOUND nel handler).
+    public JsonObject playerStats(int userId, UserStore store) {
+        UserStore.User u = store.getById(userId);
+        if (u == null) 
+            return null;
         JsonObject o = new JsonObject();
-        if (u == null) { o.addProperty("errorCode", Errors.ERR_USER_NOT_FOUND.name()); return o; }
-        int played = u.puzzlesPlayed;
-        o.addProperty("puzzlesCompleted", played);
-        o.addProperty("winRate", played == 0 ? 0 : (100 * u.puzzlesWon / played));
-        o.addProperty("lossRate", played == 0 ? 0 : (100 * u.puzzlesLost / played));
-        o.addProperty("currentStreak", u.currentStreak);
-        o.addProperty("maxStreak", u.maxStreak);
-        o.addProperty("perfectPuzzles", u.perfectPuzzles);
-        JsonArray hist = new JsonArray();
-        for (int x : u.mistakeHist) hist.add(x);
-        o.add("mistakeHistogram", hist);
+        synchronized (u) {
+            int played = u.puzzlesPlayed;
+            o.addProperty("puzzlesCompleted", played);
+            o.addProperty("winRate", played == 0 ? 0 : (100 * u.puzzlesWon / played));
+            o.addProperty("lossRate", played == 0 ? 0 : (100 * u.puzzlesLost / played));
+            o.addProperty("currentStreak", u.currentStreak);
+            o.addProperty("maxStreak", u.maxStreak);
+            o.addProperty("perfectPuzzles", u.perfectPuzzles);
+            JsonArray hist = new JsonArray();
+            for (int x : u.mistakeHist)
+                hist.add(x);
+            o.add("mistakeHistogram", hist);
+        }
         return o;
     }
 
-    /** A fine partita: registra esiti e aggiorna statistiche di ogni giocatore. */
-    public void finalizeGame(UserStore store) {
-        ActiveGame g = current();
-        if (g == null) return;
-        GameHistory h = history.computeIfAbsent(g.gameId, k -> new GameHistory());
-        for (String u : g.participants()) {
-            PlayerState ps = g.getState(u);
-            ActiveGame.Outcome oc = g.outcomeOf(ps);
-            int score = ps.score();
-            HistoryEntry he = new HistoryEntry();
-            he.correct = ps.correctCount; he.errors = ps.errorCount;
-            he.score = score; he.outcome = oc.name();
-            h.entries.put(u, he);
+    // A fine partita: chiude la partita, registra esiti in storico e aggiorna UserStore.
+    public synchronized void finalizeGame(UserStore store) {
+        ActiveGame g = current;
+        if (g == null) 
+            return;
+        g.finalized.set(true); // sigilla: submit/join rifiutano dopo la rotazione (AtomicBoolean)
+        GameHistory h = new GameHistory();
+        h.roundId = g.roundId;
+        h.sourceGameId = g.gameId;
+        h.groups = g.groupInfo();
+        for (int u : g.participants()) {
+            HistoryEntry he;
+            ActiveGame.Outcome oc;
+            synchronized (g) {
+                PlayerState ps = g.getState(u);
+                if (ps == null) continue;
+                oc = g.outcomeOf(ps);
+                he = new HistoryEntry();
+                he.correct = ps.correctCount; he.errors = ps.errorCount;
+                he.score = ps.score(); he.outcome = oc.name();
+            }
+            // Risoluzione per id IMMUTABILE: sopravvive alla rinomina delle credenziali
+            // avvenuta durante la partita (fix: lo stato di gioco è chiave per userId).
+            UserStore.User user = store.getById(u);
+            if (user == null)
+                continue;          // utente non persistito: niente storico, niente stat
+            h.entries.put(user.id, he);          // chiave = id immutabile (B), non username
 
-            UserStore.User user = store.getByName(u);
-            if (user == null) continue;
             synchronized (user) {
                 user.puzzlesPlayed++;
-                user.cumulativeScore += score;
+                user.cumulativeScore += he.score;
                 if (oc == ActiveGame.Outcome.WON) {
                     user.puzzlesWon++;
                     user.currentStreak++;
                     user.maxStreak = Math.max(user.maxStreak, user.currentStreak);
-                    if (ps.errorCount == 0) user.perfectPuzzles++;
-                    user.mistakeHist[ps.errorCount]++;
+                    if (he.errors == 0) user.perfectPuzzles++;
+                    user.mistakeHist[he.errors]++;
                 } else if (oc == ActiveGame.Outcome.LOST) {
                     user.puzzlesLost++;
                     user.currentStreak = 0;
@@ -233,6 +385,49 @@ public class GameManager {
                     user.mistakeHist[5]++;
                 }
             }
+        }
+        history.put(h.roundId, h);
+        if (history.size() > HISTORY_CAP) 
+            trimHistory();
+    }
+
+    // Tiene lo storico bounded rimuovendo il roundId più basso.
+    private void trimHistory() {
+        int min = Integer.MAX_VALUE;
+        for (int k : history.keySet()) 
+            min = Math.min(min, k);
+        history.remove(min);
+    }
+
+    // PERSISTENZA STORICO.
+    public synchronized void persistHistory() throws IOException {
+        JsonElement je = GSON.toJsonTree(history);
+        Path p = Path.of(historyFile);
+        if (p.getParent() != null) 
+            Files.createDirectories(p.getParent());
+        Path tmp = Path.of(historyFile + ".tmp");
+        try (BufferedWriter w = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
+            GSON.toJson(je, w);
+        }
+        Files.move(tmp, p, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    private void loadHistory() {
+        Path p = Path.of(historyFile);
+        if (!Files.exists(p)) 
+            return;
+        try (BufferedReader r = Files.newBufferedReader(p, StandardCharsets.UTF_8)) {
+            Type type = new TypeToken<ConcurrentHashMap<Integer, GameHistory>>(){}.getType();
+            ConcurrentHashMap<Integer, GameHistory> loaded = GSON.fromJson(r, type);
+            if (loaded == null) 
+                return;
+            history.putAll(loaded);
+            int max = 0;
+            for (int k : loaded.keySet()) 
+                max = Math.max(max, k);
+            nextRoundId.set(max + 1); // si riparte da dove lasciato
+        } catch (Exception e) {
+            System.err.println("[GameManager] load history fallito (" + e.getMessage() + "), parto vuoto");
         }
     }
 }

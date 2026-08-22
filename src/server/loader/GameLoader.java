@@ -5,7 +5,6 @@ import com.google.gson.JsonSyntaxException;
 import com.google.gson.stream.JsonReader;
 import server.model.GameData;
 
-import java.io.Closeable;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -54,7 +53,13 @@ public class GameLoader {
             return n;
         }
     }
-
+    
+    /**
+     * Generatore lazy: scorre gli oggetti uno a uno, ciclico all'infinito.
+     * Ogni next() parsa UN solo oggetto (memoria costante); alla fine del file
+     * il reader viene riaperto e il ciclo ricomincia. Su un oggetto illeggibile
+     * si riapre e si riprende dal successivo (mai spin/loop infinito).
+     */
     public final class CyclicGameIterator implements Iterator<GameData> {
         private JsonReader reader;
         private boolean open = false;
@@ -75,7 +80,7 @@ public class GameLoader {
         @Override
         public boolean hasNext() { return true; } // ciclico: sempre vero
 
-        // Robusto e testardo: in caso di json malformato, non si pianta.
+        // Robusto: in caso di JSON malformato, non si pianta.
         // "Salta l'errore" e riprova subito dopo.
         @Override
         public GameData next() {
@@ -104,13 +109,7 @@ public class GameLoader {
         }
     }
 
-    /**
-     * Generatore lazy: scorre gli oggetti uno a uno, ciclico all'infinito.
-     * Ogni next() parsa UN solo oggetto (memoria costante); alla fine del file
-     * il reader viene riaperto e il ciclo ricomincia. Su un oggetto illeggibile
-     * si riapre e si riprende dal successivo (mai spin/loop infinito).
-     */
-    public Iterator<GameData> cyclicIterator() {
+    public CyclicGameIterator cyclicIterator() {
         return new CyclicGameIterator();
     }
 

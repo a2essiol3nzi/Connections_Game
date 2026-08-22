@@ -3,11 +3,8 @@ package server.protocol;
 import java.util.List;
 
 /**
- * Envelope di RICHIESTA dal client (§5). Tutti i campi sono opzionali nel JSON:
+ * Envelope di RICHIESTA dal client. Tutti i campi sono opzionali nel JSON:
  * GSON lascia `null` ciò che non è presente. La chiave `"operation"` è obbligatoria.
- *
- * Pacchetto `protocol`: contiene i tipi di scambio messaggi condivisi tra
- * client e server (Request, Response, Errors).
  */
 public class Request {
 

@@ -1,3 +1,5 @@
+# dir con file eseguibili
 out/
 
+# dir di config IDE
 .vscode/
