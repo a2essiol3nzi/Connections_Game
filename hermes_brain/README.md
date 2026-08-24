@@ -25,13 +25,14 @@ Gioco "Connections" (NYT) implementato in **Java** con architettura **client-ser
 - Compilazione: `javac -cp lib/gson-2.11.0.jar -d out $(find src -name '*.java')`
 - Esecuzione: `java -cp out:lib/gson-2.11.0.jar server.core.ServerMain`
 - JAR: manifest `Main-Class` in `server.jar`/`client.jar`; allegare `lib/gson-2.11.0.jar`.
+- `build.sh` (nuovo) presente alla radice per compilare/eseguire.
 
 ## Package server (mappa)
 - `core/`: `ServerMain` (entry), `ServerConfig` (`.properties`), `Context` (risorse),
   `GameManager` (logica+storico), `ActiveGame`+`PlayerState` (partita), `UserStore` (identità).
 - `loader/`: `GameLoader` (streaming pigro, `CyclicGameIterator`).
 - `model/`: `GameData` (POJO partite).
-- `network/`: `ConnectionAcceptor`, `ClientHandler`, `GameScheduler`, `UdpNotifier`.
+- `network/`: `ConnectionAcceptor`, `ClientHandler`, `GameScheduler`, `UdpNotifier`, `UdpRegistry`.
 - `persistence/`: `PersistenceThread` (utenti+storico).
 - `protocol/`: `Errors`, `Request`, `Response`.
 
@@ -45,11 +46,12 @@ Gioco "Connections" (NYT) implementato in **Java** con architettura **client-ser
 3. Gap tra partite → **immediato** (auto-join `onlineUsers`).
 4. Password → **in chiaro** (scelta consapevole; non focalizza sicurezza).
 5. Libreria JSON → **Gson** (jar allegato).
-6. Codici errore → **testuali** centralizzati in `protocol/Errors`.
+6. Codici errore → **testuali** centralizzati in `protocol/Errors` (enum).
 7. Sentinel "partita corrente" → `roundId = -1` (INT). `gameId` sorgente si ripete; `roundId` monotono.
 8. Persistenza → **utenti + storico partite** (JSON separati).
 9. Outcome per giocatore ∈ {WON, LOST(4 errori), NOT_FINISHED(timeout)}.
 10. Mistake Histogram: bin vittorie 0-3 errori + fallite(4) + not_finished.
+11. Notifiche UDP → **unicast** a endpoint registrati (`UdpRegistry`: IP TCP + port dal login).
 
 ## Convenzioni adottate qui
 - Lingua: italiano (match progetto/utente).

@@ -134,6 +134,8 @@ public class UserStore {
             if (id == null) 
                 return Errors.ERR_USER_NOT_FOUND;
             User u = byId.get(id);
+            if (u == null)
+                return Errors.ERR_USER_NOT_FOUND;  // difesa in caso di store incoerente
             synchronized (u) {
                 if (!Objects.equals(oldPsw, u.password)) 
                     return Errors.ERR_WRONG_PASSWORD;

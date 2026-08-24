@@ -16,9 +16,13 @@ import java.util.Random;
 /**
  * Partita ATTIVA (unica, globale). Gestisce valutazione proposte e stato per giocatore.
  *
- * Concorrenza: Il flag `finalized` (AtomicBoolean) segnala che la partita è stata conclusa
- * dallo scheduler: submit/join lo leggono e rifiutano ulteriori azioni, chiudendo
- * la corsa tra la lettura di `current()` e la mutazione della partita.
+ * Concorrenza:
+ *   - `finalized` (AtomicBoolean): lettura volatile, segnala conclusione partita;
+ *   - `join()`: synchronized su this (è raro, eseguito solo al login);
+ *   - `submit()`: lock GRANULARE su PlayerState: N client sottomettono in parallelo;
+ *   - `players` (ConcurrentHashMap): thread-safe lookups senza lock esterno;
+ *   - Validazioni read-only (shuffledWords, groups): thread-safe senza lock
+ *     (immutabili dopo costruzione).
  */
 public class ActiveGame {
 
@@ -59,26 +63,14 @@ public class ActiveGame {
         this.shuffledWords = Collections.unmodifiableList(all);
     }
 
-    // Partecipazione alla partita.
-    public synchronized JoinResult join(int userId) {
-        if (finalized.get())
-            return JoinResult.ERR_FINISHED;
-        players.computeIfAbsent(userId, PlayerState::new);
-        return JoinResult.OK;
-    }
-
-    /**
-     * Esito di una partecipazione. Un'unica sorgente per i codici emessi da 
-     * join e consumati dal GameManager.
-     * `isOk()` distingue successo/errore senza letterali sparsi.
-     */
+    // Esito di una partecipazione. 
     public enum JoinResult {
         OK(null, null),
         ERR_FINISHED(null, Errors.ERR_GAME_OVER_FOR_YOU),
         ERR_NO_ACTIVE_GAME(null, Errors.ERR_NO_ACTIVE_GAME);
 
         final String result;  // etichetta esito OK (qui sempre null: join non ha payload)
-        final Errors error;    // codice wire (brain §5); null sui successi
+        final Errors error;    // codice errore; null sui successi
 
         JoinResult(String result, Errors error) { this.result = result; this.error = error; }
         
@@ -87,20 +79,7 @@ public class ActiveGame {
         public Errors error() { return error; }
     }
 
-    public PlayerState getState(int userId) {
-        return players.get(userId);
-    }
-
-    public Set<Integer> participants() {
-        return new HashSet<>(players.keySet());
-    }
-
-    /**
-     * Esito di una proposta: un'unica sorgente per i codici emessi da submit
-     * e consumati dal ClientHandler. Ogni costante porta l'etichetta `result` (solo
-     * sui successi, es. "CORRECT") e il codice wire `error` (solo sugli errori, da
-     * Errors). `isOk()` distingue successo/errore senza letterali sparsi.
-     */
+    // Esito di valutazione di una proposta.
     public enum SubmitResult {
         OK_FOUND("CORRECT", null),
         OK_WRONG("WRONG", null),
@@ -119,6 +98,22 @@ public class ActiveGame {
         public Errors error() { return error; }
     }
 
+    public PlayerState getState(int userId) {
+        return players.get(userId);
+    }
+
+    public Set<Integer> participants() {
+        return new HashSet<>(players.keySet());
+    }
+
+    // Partecipazione alla partita.
+    public synchronized JoinResult join(int userId) {
+        if (finalized.get())
+            return JoinResult.ERR_FINISHED;
+        players.computeIfAbsent(userId, PlayerState::new);
+        return JoinResult.OK;
+    }
+
     /**
      * Valuta una proposta di 4 parole per un utente.
      *   OK_FOUND      gruppo corretto (nuovo) -> +1 corretto
@@ -126,52 +121,61 @@ public class ActiveGame {
      *   ERR_MALFORMED parole non valide / gia trovate / non 4 distinte -> nessun impatto
      *   ERR_FINISHED utente ha gia finito (o partita conclusa) -> nessun impatto
      *   ERR_NOTJOINED utente non partecipa -> nessun impatto
+     *
+     * CONCORRENZA: Lock GRANULARE su PlayerState (ps), NON su ActiveGame.
+     * Questo consente N client di sottomettere PARALLELAMENTE proposte diverse
+     * senza serializzazione. Validazioni read-only avvengono senza lock;
+     * modifiche a ps sono protette da synchronized(ps).
+     * 
+     * Nota: per evitare TOCTOU si fa un ri-checking di finalized.
      */
-    public synchronized SubmitResult submit(int userId, List<String> words) {
+    public SubmitResult submit(int userId, List<String> words) {
         if (finalized.get()) 
             return SubmitResult.ERR_FINISHED;
         PlayerState ps = players.get(userId);
         if (ps == null) 
             return SubmitResult.ERR_NOTJOINED;
-        if (ps.finished) 
-            return SubmitResult.ERR_FINISHED;
-
-        // validità formale (MALFORMED se fallisce -> nessun impatto stato)
-        if (words == null || words.size() != 4) 
+        if ((words == null) || (words.size() != 4)) 
             return SubmitResult.ERR_MALFORMED;
         Set<String> proposed = new HashSet<>(words);
         if (proposed.size() != 4) 
-            return SubmitResult.ERR_MALFORMED;    // duplicati
+            return SubmitResult.ERR_MALFORMED; // duplicati
         for (String w : proposed)
             if (!shuffledWords.contains(w)) 
-                return SubmitResult.ERR_MALFORMED;  // parola fuori gioco
-        // parola già in un gruppo trovato -> MALFORMED (non errore)
-        for (int gi : ps.foundGroups)
-            if (proposed.containsAll(groups.get(gi).words)) 
-                return SubmitResult.ERR_MALFORMED;
-        // correttezza gruppo
-        for (int gi = 0; gi < groups.size(); gi++) {
-            if (proposed.equals(groups.get(gi).words)) {
-                if (!ps.foundGroups.contains(gi)) { // gruppo nuovo e corretto
-                    ps.foundGroups.add(gi);
-                    ps.correctCount++;
-                    if (ps.correctCount >= 3) 
-                        ps.finished = true; // vittoria!
-                    return SubmitResult.OK_FOUND;
-                } else {
-                    return SubmitResult.ERR_MALFORMED; // corretto ma già trovato
+                return SubmitResult.ERR_MALFORMED; // parola non proposta
+        synchronized (ps) {
+            // Richeck finalized (potrebbe essere cambiato tra step 1 e ora)
+            if (finalized.get()) 
+                return SubmitResult.ERR_FINISHED;
+            if (ps.finished) 
+                return SubmitResult.ERR_FINISHED;
+            for (int gi : ps.foundGroups)
+                if (proposed.containsAll(groups.get(gi).words))  // parola già usata 
+                    return SubmitResult.ERR_MALFORMED;
+            for (int gi = 0; gi < groups.size(); gi++) {
+                if (proposed.equals(groups.get(gi).words)) { // gruppo corretto
+                    if (!ps.foundGroups.contains(gi)) { // gruppo nuovo
+                        ps.foundGroups.add(gi);
+                        ps.correctCount++;
+                        if (ps.correctCount >= 3) 
+                            ps.finished = true; // vittoria!
+                        return SubmitResult.OK_FOUND;
+                    } else { // gruppo già trovato
+                        return SubmitResult.ERR_MALFORMED;
+                    }
                 }
             }
+            // gruppo errato
+            ps.errorCount++;
+            if (ps.errorCount >= 4)  // sconfitta! 
+                ps.finished = true;
+            return SubmitResult.OK_WRONG;
         }
-        // nessun gruppo coincide -> ERRATA (conta come errore)
-        ps.errorCount++;
-        if (ps.errorCount >= 4) 
-            ps.finished = true; // sconfitta!
-        return SubmitResult.OK_WRONG;
     }
 
     // Assignment completo (tema + parole); per lo storico (riusa GameData.Group).
-    public synchronized GameData.Group[] groupInfo() {
+    // Le groups sono immutabili dopo il costruttore, quindi non serve lock.
+    public GameData.Group[] groupInfo() {
         GameData.Group[] out = new GameData.Group[groups.size()]; // 4 gruppi
         for (int i = 0; i < groups.size(); i++) {
             ThemeGroup g = groups.get(i);
@@ -184,20 +188,24 @@ public class ActiveGame {
     }
 
     // Parole dei gruppi già individuati dal giocatore (calcolo "remaining").
-    public synchronized List<String> wordsOfFoundGroups(PlayerState ps) {
-        List<String> out = new ArrayList<>();
-        for (int gi : ps.foundGroups) 
-            out.addAll(groups.get(gi).words);
-        return out;
+    public List<String> wordsOfFoundGroups(PlayerState ps) {
+        synchronized (ps) {
+            List<String> out = new ArrayList<>();
+            for (int gi : ps.foundGroups) 
+                out.addAll(groups.get(gi).words);
+            return out;
+        }
     }
 
     public enum Outcome { WON, LOST, NOT_FINISHED }
     
-    public synchronized Outcome outcomeOf(PlayerState ps) {
-        if (ps.correctCount >= 3) 
-            return Outcome.WON;
-        if (ps.errorCount >= 4) 
-            return Outcome.LOST;
-        return Outcome.NOT_FINISHED;
+    public Outcome outcomeOf(PlayerState ps) {
+        synchronized (ps) {
+            if (ps.correctCount >= 3) 
+                return Outcome.WON;
+            if (ps.errorCount >= 4) 
+                return Outcome.LOST;
+            return Outcome.NOT_FINISHED;
+        }
     }
 }

@@ -9,6 +9,11 @@ import java.util.Set;
  *   - errorCount: proposte ERRATE (0..4); 4 -> sconfitta;
  *   - correctCount: gruppi trovati (0..3); 3 -> vittoria;
  *   - finished: true se ha vinto/perso (non può più inviare proposte).
+ *
+ * CONCORRENZA: Istanze di PlayerState sono protette da lock GRANULARE.
+ * Ogni submit() acquisisce synchronized(ps) SOLO per modifiche a questo stato,
+ * consentendo N client di sottomettere proposte PARALLELAMENTE senza
+ * serializzazione globale. Non è thread-safe di per sé; il locking è esterno.
  */
 public class PlayerState {
     public final int userId; // id immutabile dell'account (non lo username)

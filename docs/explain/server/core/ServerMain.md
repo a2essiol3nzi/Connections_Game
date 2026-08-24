@@ -11,12 +11,12 @@ infine apre l'acceptor TCP sul thread principale (bloccante).
    Errore di lettura → `System.exit(2)`.
 2. **Loader partite** — `new GameLoader(cfg.gamesFile)` (streaming Gson, O(1)).
    Errore → `System.exit(3)`.
-3. **Risorse condivise** — `new Context(cfg, loader)`.
-4. **Thread supporto** — `GameScheduler` e `PersistenceThread` (oggetti `Runnable`
-   avviati come `Thread`).
-5. **Shutdown hook** — `Runtime.addShutdownHook(...)`: su SIGTERM/SIGINT chiama
-   `ctx.users.persist()` (salva gli utenti prima di uscire, nessuna perdita
-   dell'ultima partita finalizzata).
+3. **Risorse condivise** — `new Context(cfg, loader)` (crea store/manager/registry UDP/notifier).
+4. **Thread supporto** — `GameScheduler` (games/users/notifier) e `PersistenceThread`
+   (users/**games**/intervalSec): entrambi avviati come `Thread`.
+5. **Shutdown hook** — `addShutdownHook(...)`: su SIGTERM/SIGINT chiama
+   `ctx.users.persist()` **e** `ctx.games.persistHistory()` (salva ultima
+   partita + storico prima di uscire).
 6. **Acceptor TCP** — `Executors.newFixedThreadPool(cfg.poolSize)` +
    `ConnectionAcceptor.run()` sul main thread.
 
@@ -25,8 +25,7 @@ infine apre l'acceptor TCP sul thread principale (bloccante).
 `PersistenceThread`. Nessuna logica di gioco qui: solo wiring.
 
 ## Collegamenti
-- `core/ServerConfig`: parametri da `.properties`.
-- `core/Context`: raggruppa loader/store/manager/notifier.
-- `network/ConnectionAcceptor`: ciclo accept∞.
-- `network/GameScheduler` + `persistence/PersistenceThread`: thread di servizio.
-- `persistence/UserStore`: lo shutdown hook ne chiama `persist()`.
+- `core/ServerConfig` / `core/Context`: parametri e risorse.
+- `network/ConnectionAcceptor`, `network/GameScheduler`, `persistence/PersistenceThread`:
+  thread di servizio.
+- `core/UserStore` + `core/GameManager`: lo shutdown hook li persiste.

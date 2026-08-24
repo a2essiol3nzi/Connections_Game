@@ -18,7 +18,7 @@ public enum Errors {
     ERR_USERNAME_TAKEN("Username già registrato"),
     ERR_WRONG_PASSWORD("Password errata"),
     ERR_NOT_LOGGED_IN("Operazione richiesta ma utente non loggato"),
-    ERR_ALREADY_LOGGED_IN("Utente già loggato altrove su questa sessione"),
+    ERR_ALREADY_LOGGED_IN("Utente già loggato"),
     ERR_NOT_JOINED("Utente non partecipa alla partita corrente"),
     ERR_NO_ACTIVE_GAME("Nessuna partita attiva al momento"),
     ERR_GAME_NOT_FOUND("Partita inesistente"),
@@ -27,7 +27,7 @@ public enum Errors {
     ERR_PLAYER_NOT_FOUND("Giocatore inesistente"),
     UNKNOWN_OPERATION("Operazione sconosciuta");
 
-    /** Spiegazione umana associata al codice. */
+    // Spiegazione umana associata al codice.
     public final String message;
 
     Errors(String message) {

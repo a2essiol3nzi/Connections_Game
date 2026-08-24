@@ -9,21 +9,21 @@ import java.io.IOException;
 import java.util.Set;
 
 /**
- * Scheduler della partita attiva (unico thread). Ciclo:
- *   attende scadenza partita corrente -> finalizza (esiti+UserStore) ->
- *   persist event-driven (stat su disco subito) -> invia notifica UDP a tutti
- *   i partecipanti -> ruota alla partita successiva.
+ * Scheduler della partita attiva. Ciclo: attende scadenza partita corrente 
+ * -> finalizza (esiti+UserStore) -> persist event-driven (stat su disco 
+ * subito) -> invia notifica UDP a tutti i partecipanti -> ruota alla partita 
+ * successiva.
  * Coordinazione via Thread.sleep fino a endTime (no wait/notify necessario).
  * Lo swap di ActiveGame avviene in GameManager.rotate (synchronized).
  */
 public class GameScheduler implements Runnable {
 
-    private final GameManager gm;
+    private final GameManager gameMan;
     private final UserStore users;
     private final UdpNotifier notifier;
 
     public GameScheduler(GameManager gm, UserStore users, UdpNotifier notifier) {
-        this.gm = gm;
+        this.gameMan = gm;
         this.users = users;
         this.notifier = notifier;
     }
@@ -31,19 +31,18 @@ public class GameScheduler implements Runnable {
     @Override
     public void run() {
         while (true) {
-            ActiveGame g = gm.current();
+            ActiveGame g = gameMan.current();
             if (g == null) { 
-                sleep(1000); 
+                sleep(1000); // rallenta il polling / busy-wait 
                 continue; 
             }
             long waitMs = g.endTimeMs - System.currentTimeMillis();
             if (waitMs > 0) 
-                sleep(waitMs);
-
-            gm.finalizeGame(users);
+                sleep(waitMs); // durata partita
+            gameMan.finalizeGame(users);
             try {
-                users.persist(); // persist event-driven: stat su disco subito, non entro 30s
-                gm.persistHistory(); // persistenza storico partite su disco
+                users.persist(); // persist event-driven
+                gameMan.persistHistory(); // persistenza storico partite su disco
             } catch (IOException e) {
                 System.err.println("[Scheduler] persist failed: " + e.getMessage());
             }
@@ -55,7 +54,7 @@ public class GameScheduler implements Runnable {
             notifier.notifyEnd(parts, note);
 
             System.out.println("[Scheduler] game " + g.gameId + " (round " + g.roundId + ") ended, " + parts.size() + " players");
-            gm.rotate(System.currentTimeMillis());
+            gameMan.rotate(System.currentTimeMillis());
         }
     }
 

@@ -1,7 +1,7 @@
 # Protocollo e messaggi (§5)
 
 Tutti i messaggi sono **stringhe JSON**. Envelope risposta (formato adottato):
-`{"status":"OK", "payload":{...}}` oppure `{"status":"ERR", "errorCode":"ERR_...", "payload":null}`.
+`{"status":"OK", "payload":{...}}` oppure `{"status":"ERROR", "errorCode":"ERR_...", "message":"...", "payload":null}`.
 Lato server l'identificazione è per **userId immutabile** (non username).
 
 ## Richieste (client → server)
@@ -9,8 +9,8 @@ Lato server l'identificazione è per **userId immutabile** (non username).
 |----|-------------------|------|
 | register | `operation`, `username`, `psw` | TCP (nuovo ordinamento) |
 | updateCredentials | `operation`, `oldUsername`, `oldPsw`, + `newUsername`\|`newPsw` (≥1) | aggiorna nome e/o psw |
-| login | `operation`, `username`, `psw` | auto-join partita corrente (registra `userId` online) |
-| logout | `operation` | rimuove `userId` dal registry online |
+| login | `operation`, `username`, `psw`, **`udpPort` (1..65535)** | auto-join + registra endpoint UDP (IP dal socket TCP) |
+| logout | `operation` | rimuove userId dal registry online + UDP |
 | submitProposal | `operation`, `words:[4 STRING]` | 4 parole distinte (valutate per `userId`) |
 | requestGameInfo | `operation`, `gameId:INT` | `roundId = -1` = corrente; altro = storico (espone `assignment`+tema) |
 | requestGameStats | `operation`, `gameId:INT` | `roundId = -1` = corrente |
@@ -18,18 +18,19 @@ Lato server l'identificazione è per **userId immutabile** (non username).
 | requestPlayerStats | `operation` | per `userId` loggato |
 
 ## Codici errore (enum `protocol/Errors`, centralizzato)
+- `BAD_REQUEST` — JSON illeggibile / operation mancante / `udpPort` assente o invalido
 - register: `ERR_USERNAME_TAKEN`, `ERR_INVALID`
 - updateCredentials: `ERR_WRONG_PASSWORD`, `ERR_USERNAME_TAKEN`, `ERR_USER_NOT_FOUND`
-- login: `ERR_WRONG_PASSWORD`, `ERR_USER_NOT_FOUND`
+- login: `ERR_WRONG_PASSWORD`, `ERR_USER_NOT_FOUND`, `ERR_ALREADY_LOGGED_IN`
 - logout: `ERR_NOT_LOGGED_IN`
 - submitProposal: `ERR_NOT_LOGGED_IN`, `ERR_NO_ACTIVE_GAME`, `ERR_GAME_OVER_FOR_YOU`,
   `ERR_MALFORMED` (parola non nel gioco / già assegnata / ≠4 distinte), `ERR_NOT_JOINED`
 - requestGameInfo/Stats: `ERR_GAME_NOT_FOUND`, `ERR_NO_ACTIVE_GAME`
-- requestLeaderboard: — (rank `-1` se utente assente)
+- requestLeaderboard: `ERR_PLAYER_NOT_FOUND`
 - requestPlayerStats: `ERR_NOT_LOGGED_IN`, `ERR_USER_NOT_FOUND`
-- `UNKNOWN_OPERATION`, `BAD_REQUEST` (envelope/dispatch)
+- `UNKNOWN_OPERATION`
 
-> `ERR_ALREADY_LOGGED_IN` **rimosso**: il login su id già online non è più un caso a parte gestito.
+> `ERR_ALREADY_LOGGED_IN` è il codice per login duplicato; `ERR_NOT_LOGGED_IN` resta per chiamate protette senza autenticazione.
 
 ## Regola MALFORMATA vs ERRATA (§2.2 — fondamentale)
 - **Errata** = 4 parole valide del gioco che NON formano un gruppo corretto
@@ -49,11 +50,12 @@ Caricamento pigro via `GameLoader` (`JsonReader`+`skipValue`, O(1)).
 
 ## Storico partite (persistito, novità)
 `GameManager.history` chiave = `roundId` (monotono); `GameHistory = {roundId, sourceGameId,
-GroupInfo[4] (tema+parole), entries: Map<userId, {correct,errors,score,outcome}>}`.
-Persistito in `data/history.json` (atomico, cap 1000 round). `requestGameInfo(roundId!=-1)`
-lo espone includendo il `theme` (a fine partita è lecito).
+GameData.Group[4] (tema+parole), entries: Map<userId, {correct,errors,score,outcome}>}`.
+Persistito in `data/history.json` (atomico, cap 10_000 round). `requestGameInfo(roundId!=-1)`
+lo espone includendo il `theme` (a fine partita è lecito). `finalizeGame` è **idempotente**
+(`compareAndSet` su `finalized`): chiamato da scheduler + shutdown hook + timer, conta 1 sola volta.
 
 ## Notifiche async UDP (§2.2, §3)
-Al termine partita: `GameScheduler` invia a ogni partecipante (unicast loopback)
-`{type:"GAME_ENDED", gameId, roundId}`. Client deve avere thread UDP in ascolto (C3)
-concorrente al NIO TCP.
+Al termine partita: `GameScheduler` invia a ogni partecipante (unicast, endpoint dal
+`UdpRegistry`) `{type:"GAME_ENDED", gameId, roundId}`. Client deve avere thread UDP in
+ascolto (C2) concorrente al NIO TCP.

@@ -2,6 +2,7 @@ package server.core;
 
 import server.loader.GameLoader;
 import server.network.UdpNotifier;
+import server.network.UdpRegistry;
 
 /**
  * Contenitore delle risorse condivise del server, passato agli handler e agli
@@ -12,12 +13,14 @@ public class Context {
     public final ServerConfig cfg;
     public final UserStore users;
     public final GameManager games;
+    public final UdpRegistry udpRegistry;
     public final UdpNotifier notifier;
 
     public Context(ServerConfig cfg, GameLoader loader) {
         this.cfg = cfg;
         this.users = new UserStore(cfg.persistFile);
         this.games = new GameManager(loader, cfg.gameDurationSec, cfg.historyFile);
-        this.notifier = new UdpNotifier(cfg.udpPort);
+        this.udpRegistry = new UdpRegistry();
+        this.notifier = new UdpNotifier(udpRegistry);
     }
 }

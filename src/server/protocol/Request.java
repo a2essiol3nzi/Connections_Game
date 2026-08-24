@@ -18,6 +18,9 @@ public class Request {
     public String newUsername;
     public String newPsw;
 
+    // login: porta UDP su cui il client ascolta notifiche (OBBLIGATORIA per login)
+    public Integer udpPort;
+
     // submitProposal: le 4 parole proposte
     public List<String> words;
 

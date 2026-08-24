@@ -4,17 +4,17 @@
 | ID | Componente | Stato | Note |
 |----|-----------|-------|------|
 | S1 | Config (`core/ServerConfig`) | 🟢 | arg opzionale path; `historyFile` nuovo campo; gestione eccezioni esplicita |
-| S2 | Loader partite (`loader/GameLoader`) | 🟢 | **PIGRO**: streaming Gson `JsonReader` O(1); `CyclicGameIterator` (classe pubblica); skip entry malformate a runtime; verificato |
-| S3 | UserStore (`core/UserStore`) | 🟢 | **spostato in `core/`** (da `persistence/`); id immutabile + indice `nameToId`; `getById`/`getByName`; per-account lock; psw in chiaro; persist atomico **+ synchronized** (3 fonti: timer/scheduler/shutdown-hook); verificato |
-| S4 | Game model (`core/ActiveGame`/`PlayerState`) | 🟢 | `roundId` univoco + `finalized` (AtomicBoolean); stato per **userId**; valutazione malformata/errata; score; outcome; verificato |
-| S5 | Scheduler (`network/GameScheduler`) | 🟢 | sleep→finalize→**persist event-driven (utenti+storico)**→UDP(roundId)→rotate(auto-join online) |
+| S2 | Loader partite (`loader/GameLoader`) | 🟢 | **PIGRO**: streaming Gson `JsonReader` O(1); `CyclicGameIterator` (classe pubblica); skip entry malformate a runtime |
+| S3 | UserStore (`core/UserStore`) | 🟢 | **in `core/`**; id immutabile + indice `nameToId`; metodi ritornano `Errors`; `getById`/`getByName`; per-account lock; psw in chiaro; persist atomico **+ synchronized** (3 fonti) |
+| S4 | Game model (`core/ActiveGame`/`PlayerState`) | 🟢 | `roundId` univoco + `finalized` (AtomicBoolean); stato per **userId**; enum `JoinResult`/`SubmitResult` con `Errors`; `Outcome`; verificato |
+| S5 | Scheduler (`network/GameScheduler`) | 🟢 | sleep→finalize(idempotente)→**persist event-driven (utenti+storico)**→UDP→rotate(auto-join online) |
 | S6 | TCP acceptor+pool (`network/ConnectionAcceptor`) | 🟢 | |
-| S7 | Handler (`network/ClientHandler`) | 🟢 | dispatch 9 op; gate `loggedInUserId` (id immutabile); catch(Exception) non uccide il worker; null=OK |
-| S8 | UDP notifier (`network/UdpNotifier`) | 🟡 | pronto; ricezione client in P2; payload con `roundId` |
-| S9 | Classifica+stats+storico (`core/GameManager`) | 🟢 | leaderboard (cumulative), game/player stats; **storico persistito** (`historyFile`, cap 1000); `onlineUsers` auto-join; verificato |
-| S10 | Persistenza (`persistence/PersistenceThread`) | 🟢 | persiste **utenti + storico** (non solo utenti) |
-| S11 | Protocollo errori (`protocol/Errors`) | 🟢 | enum centralizzato; `null`=OK; `ERR_ALREADY_LOGGED_IN` **rimosso** |
-| S12 | Envelope (`protocol/Request`/`Response`) | 🟢 | `gameId=-1` ⇒ corrente; `requestGameInfo` storico espone `assignment`+tema |
+| S7 | Handler (`network/ClientHandler`) | 🟢 | dispatch 9 op; gate auth; `udpPort` obbligatorio + registro UDP; catch(Exception) non uccide worker; `Errors`/`null` |
+| S8 | UDP registry+notifier (`network/UdpRegistry`/`UdpNotifier`) | 🟢 | registry userId→endpoint; notifier unicast da registry; payload con `roundId` |
+| S9 | Classifica+stats+storico (`core/GameManager`) | 🟢 | leaderboard (cumulative), game/player stats; **storico persistito** (`historyFile`, cap 10_000); `onlineUsers` auto-join; `submitProposal` **synchronized** (anti-TOCTOU); `logoutUser` atomico; `finalizeGame` **idempotente** (`compareAndSet`); verificato |
+| S10 | Persistenza (`persistence/PersistenceThread`) | 🟢 | persiste **utenti + storico** |
+| S11 | Protocollo errori (`protocol/Errors`) | 🟢 | enum centralizzato; `null`=OK; +`BAD_REQUEST`,`ERR_PLAYER_NOT_FOUND`,`ERR_ALREADY_LOGGED_IN` (login duplicato) |
+| S12 | Envelope (`protocol/Request`/`Response`) | 🟢 | `gameId=-1`⇒corrente; `requestGameInfo` storico espone `assignment`+tema; `Response.err(Errors)` con `message` |
 
 ## CLIENT
 | ID | Componente | Stato | Note |
