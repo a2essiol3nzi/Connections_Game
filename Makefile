@@ -1,14 +1,19 @@
-# Makefile — compilazione server Connections (Java)
+# Makefile - compilazione server Connections (Java)
 # Uso:  make          (compila in out/)
+#       make dist     (compila + crea JAR in dist/)
 #       make run      (compila + lancia server.core.ServerMain)
-#       make clean    (rimuove out/)
+#       make run-client (compila + lancia client.ClientMain, quando esiste)
+#       make clean    (rimuove out/ e dist/)
 
 JAVAC  := javac
 JAVA   := java
+JAR    := jar
 SRC    := src
 OUT    := out
+DIST   := dist
 LIB    := lib/gson-2.11.0.jar
 MAIN   := server.core.ServerMain
+CLIENT_MAIN := client.ClientMain
 CP     := $(OUT):$(LIB)
 
 SOURCES := $(shell find $(SRC) -name '*.java')
@@ -20,10 +25,27 @@ $(OUT)/.stamp: $(SOURCES)
 
 all: $(OUT)/.stamp
 
+# JAR server (thin): gson resta in lib/, allegato a parte
+# Nota: Class-Path è relativo alla posizione del JAR (dist/) -> ../lib/
+dist/connections-server.jar: all
+	mkdir -p $(DIST)
+	printf 'Main-Class: $(MAIN)\nClass-Path: ../$(LIB)\n' > $(OUT)/manifest.txt
+	$(JAR) --create --file $@ --manifest=$(OUT)/manifest.txt -C $(OUT) .
+
+# JAR client: per ora non implementato
+dist/connections-client.jar: all
+	@if [ ! -d $(SRC)/client ]; then \
+	    echo "❌ src/client non esiste ancora: client non implementato"; exit 1; \
+	fi
+	$(JAR) --create --file $@ --main-class $(CLIENT_MAIN) -C $(OUT) .
+
 run: all
 	$(JAVA) -cp '$(CP)' $(MAIN)
 
-clean:
-	rm -rf $(OUT)
+run-client: dist/connections-client.jar
+	$(JAVA) -cp 'dist/connections-client.jar:$(LIB)' $(CLIENT_MAIN)
 
-.PHONY: all run clean
+clean:
+	rm -rf $(OUT) $(DIST)
+
+.PHONY: all run run-client clean
