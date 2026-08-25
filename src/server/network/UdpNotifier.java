@@ -26,21 +26,26 @@ public class UdpNotifier {
     // Invia notifiche di fine partita via UDP unicast ad ogni partecipante.
     public void notifyEnd(Set<Integer> participants, JsonObject payload) {
         byte[] data = GSON.toJson(payload).getBytes(StandardCharsets.UTF_8);
-        for (int userId : participants) {
-            Object[] ep = registry.getEndpoint(userId);
-            if (ep == null) {
-                System.err.println("[UdpNotifier] No endpoint registered for userId " + userId);
-                continue;
-            }
-            InetAddress addr = (InetAddress) ep[0];
-            int port = (Integer) ep[1];
-            try (DatagramSocket sock = new DatagramSocket()) {
+        // Un solo socket UDP riusato per tutti i destinatari (il `connect` ne
+        // ridefinisce il remoto prima di ogni send). `connect` rende il send
+        // non bloccante verso host irraggiungibili (PortUnreachableException
+        // immediata invece del timeout OS).
+        try (DatagramSocket sock = new DatagramSocket()) {
+            for (int userId : participants) {
+                Object[] ep = registry.getEndpoint(userId);
+                if (ep == null) {
+                    System.err.println("[UdpNotifier] No endpoint registered for userId " + userId);
+                    continue;
+                }
+                InetAddress addr = (InetAddress) ep[0];
+                int port = (Integer) ep[1];
+                sock.connect(addr, port);
                 DatagramPacket pkt = new DatagramPacket(data, data.length, addr, port);
                 sock.send(pkt);
                 System.out.println("[UdpNotifier] Notified userId " + userId + " at " + addr.getHostAddress() + ":" + port);
-            } catch (IOException e) {
-                System.err.println("[UdpNotifier] Failed to notify userId " + userId + " at " + addr.getHostAddress() + ":" + port + ": " + e.getMessage());
             }
+        } catch (IOException e) {
+            System.err.println("[UdpNotifier] Failed to notify: " + e.getMessage());
         }
     }
 }

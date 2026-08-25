@@ -11,9 +11,13 @@ Invia ai partecipanti, via UDP, la notifica di fine partita (§2.2, §3):
 
 ## Metodo principale
 - `notifyEnd(Set<Integer> participants, JsonObject payload)` — serializza il
-  payload; per ogni `userId` recupera l'endpoint dal registry (salta se assente),
-  crea `DatagramSocket` + `DatagramPacket(addr, port)` e invia. Errori di invio
-  loggati, non propagati.
+  payload; apre **UN SOLO** `DatagramSocket` riusato per tutti i destinatari.
+  Per ogni `userId` recupera l'endpoint dal registry (salta se assente),
+  `sock.connect(addr, port)` ridefinisce il remoto, poi `send(pkt)`. Il
+  `try/catch(IOException)` è **esterno** al loop (errore di apertura socket),
+  così un fallimento verso un host irraggiungibile non interrompe gli altri
+  (`connect` rende il `send` non bloccante: `PortUnreachableException` immediata
+  invece del timeout OS).
 
 ## Note
 Endpoint ricavato lato server: IP dal socket TCP + port fornito dal client al

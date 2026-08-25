@@ -15,6 +15,12 @@ import java.util.Set;
  * successiva.
  * Coordinazione via Thread.sleep fino a endTime (no wait/notify necessario).
  * Lo swap di ActiveGame avviene in GameManager.rotate (synchronized).
+ * 
+ * La notifica UDP (type: GAME_ENDED + gameId/roundId) è un segnale, non contiene 
+ * i risultati. I client, ricevuto il segnale, vanno a leggere l'esito via TCP con 
+ * requestGameInfo(roundId) / requestGameStats, che attingono dallo storico in 
+ * GameManager.history. Se la notifica arrivasse prima di finalizeGame, si aprirebbe 
+ * una TOCTOU window.
  */
 public class GameScheduler implements Runnable {
 
@@ -52,13 +58,18 @@ public class GameScheduler implements Runnable {
             note.addProperty("gameId", g.gameId);
             note.addProperty("roundId", g.roundId);
             notifier.notifyEnd(parts, note);
-
             System.out.println("[Scheduler] game " + g.gameId + " (round " + g.roundId + ") ended, " + parts.size() + " players");
             gameMan.rotate(System.currentTimeMillis());
         }
     }
 
     private static void sleep(long ms) {
-        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        long deadline = System.currentTimeMillis() + ms;
+        while (true) {
+            long rem = deadline - System.currentTimeMillis();
+            if (rem <= 0) return;
+            try { Thread.sleep(rem); return; }
+            catch (InterruptedException e) { /* retry */ }
+        }
     }
 }

@@ -35,6 +35,8 @@
 - **Lock di `submit` troppo grossolano**: `synchronized(this)` su `ActiveGame` serializzava tutte le proposte. Fix: **lock granulare su `PlayerState`** (`synchronized(ps)`) — N client sottomettono in parallelo; validazioni read-only (groups/shuffledWords immutabili) fuori lock; ri-check di `finalized` dentro il lock.
 - **Storico per username (B9)**: la rinomina invalidava l'accesso allo storico. Fix: chiave dello storico = **userId immutabile** (`entries` per id in `GameHistory`).
 - **Finalize multiplo**: scheduler + shutdown hook + timer potevano contare 2 volte. Fix: `finalizeGame` **idempotente** via `finalized.compareAndSet(false,true)`.
+- **`sleep()` dello scheduler usciva al primo `InterruptedException`**: interrompendo il thread si saltava la attesa e si procedeva a finalize/rotate anticipati. Fix: `sleep()` ricalcola il deadline e **ritenta** finché non scaduto (`while` + `rem = deadline - now`).
+- **Notifica UDP scambiata per risultato**: la `GAME_ENDED` è solo un *segnale* (gameId/roundId), non contiene l'esito. Se arriva prima di `finalizeGame` si apre una finestra TOCTOU (storico non ancora scritto). Fix (lato client, da implementare): al segnale, leggere l'esito via TCP `requestGameInfo(roundId)`/`requestGameStats` con retry/attesa. Lato server: `UdpNotifier` usa un solo `DatagramSocket` riusato con `connect()` per destinatario (non bloccante verso host irraggiungibili).
 
 ## Note utente (stile)
 - Commenti estesi OK; lui li sintetizzerà. Mantenere filosofia di scrittura attuale.
