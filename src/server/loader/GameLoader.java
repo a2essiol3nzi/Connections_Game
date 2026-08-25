@@ -71,7 +71,15 @@ public class GameLoader {
                 catch (IOException ignored) {} 
             }
             reader = open();
-            reader.beginArray();
+            try {
+                reader.beginArray();
+            } catch (IOException | RuntimeException e) {
+                // Se beginArray fallisce, la chain appena aperta va richiusa:
+                // altrimenti quest'FD resta bloccato e `open` (false) farebbe
+                // riaprire un'altra stream alla prossima next() -> leak per errore.
+                reader.close();
+                throw e;
+            }
             open = true;
         }
 

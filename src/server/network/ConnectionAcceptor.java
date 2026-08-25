@@ -31,7 +31,12 @@ public class ConnectionAcceptor implements Runnable {
                 pool.submit(new ClientHandler(client, ctx));
             }
         } catch (IOException e) {
+            // L'acceptor è l'unico loop di vita del server: se la ServerSocket
+            // fallisce (es. porta già in uso) il processo è finito. System.exit
+            // forza la terminazione. I thread helper (scheduler/persist) sono
+            // non-daemon e terrebbero il JVM appeso se li lasciassimo in vita.
             System.err.println("[Acceptor] terminato: " + e.getMessage());
+            System.exit(1);
         }
     }
 }
