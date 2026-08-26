@@ -12,15 +12,15 @@ SRC    := src
 OUT    := out
 DIST   := dist
 LIB    := lib/gson-2.11.0.jar
+CP     := $(OUT):$(LIB)
 MAIN   := server.core.ServerMain
 CLIENT_MAIN := client.ClientMain
-CP     := $(OUT):$(LIB)
-
+# --release 8: vincola sorgente + API alla versione 8 (requisito progetto)
+RELEASE := --release 8
 SOURCES := $(shell find $(SRC) -name '*.java')
 
-# ricompila solo se una sorgente è cambiata
 $(OUT)/.stamp: $(SOURCES)
-	$(JAVAC) -cp '$(CP)' -d $(OUT) $(SOURCES)
+	$(JAVAC) $(RELEASE) -cp '$(CP)' -d $(OUT) $(SOURCES)
 	touch $@
 
 all: $(OUT)/.stamp
