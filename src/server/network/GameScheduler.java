@@ -3,7 +3,7 @@ package server.network;
 import server.core.ActiveGame;
 import server.core.GameManager;
 import server.core.UserStore;
-import com.google.gson.JsonObject;
+import protocol.GameEnded;
 
 import java.io.IOException;
 import java.util.Set;
@@ -53,11 +53,8 @@ public class GameScheduler implements Runnable {
                 System.err.println("[Scheduler] persist failed: " + e.getMessage());
             }
             Set<Integer> parts = g.participants();
-            JsonObject note = new JsonObject();
-            note.addProperty("type", "GAME_ENDED");
-            note.addProperty("gameId", g.gameId);
-            note.addProperty("roundId", g.roundId);
-            notifier.notifyEnd(parts, note);
+            // Notifica UDP: POJO condiviso (protocol.GameEnded) invece di JsonObject a mano.
+            notifier.notifyEnd(parts, new GameEnded("GAME_ENDED", g.gameId, g.roundId));
             System.out.println("[Scheduler] game " + g.gameId + " (round " + g.roundId + ") ended, " + parts.size() + " players");
             gameMan.rotate(System.currentTimeMillis());
         }

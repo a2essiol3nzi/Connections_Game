@@ -1,7 +1,7 @@
 package server.core;
 
 import server.model.GameData;
-import server.protocol.Errors;
+import protocol.Errors;
 
 import java.util.ArrayList;
 import java.util.Collections;

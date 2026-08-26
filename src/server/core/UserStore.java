@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Objects;
 
-import server.protocol.Errors;
+import protocol.Errors;
 
 /**
  * Store degli UTENTI: registrazione, login, aggiornamento credenziali,

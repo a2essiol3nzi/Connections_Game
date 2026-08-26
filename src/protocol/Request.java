@@ -1,10 +1,11 @@
-package server.protocol;
+package protocol;
 
 import java.util.List;
 
 /**
  * Envelope di RICHIESTA dal client. Tutti i campi sono opzionali nel JSON:
  * GSON lascia `null` ciò che non è presente. La chiave `"operation"` è obbligatoria.
+ * Condiviso tra client (seriale) e server (deseriale).
  */
 public class Request {
 

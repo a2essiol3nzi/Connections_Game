@@ -7,9 +7,9 @@ import com.google.gson.JsonSyntaxException;
 import server.core.Context;
 import server.core.UserStore;
 import server.core.ActiveGame;
-import server.protocol.Errors;
-import server.protocol.Request;
-import server.protocol.Response;
+import protocol.Errors;
+import protocol.Request;
+import protocol.Response;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;

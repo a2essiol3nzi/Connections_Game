@@ -1,7 +1,6 @@
 package server.network;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -24,7 +23,9 @@ public class UdpNotifier {
     }
 
     // Invia notifiche di fine partita via UDP unicast ad ogni partecipante.
-    public void notifyEnd(Set<Integer> participants, JsonObject payload) {
+    // `payload` è un POJO (GameEnded) serializzato con Gson: il notifier non
+    // dipende dal formato specifico della notifica.
+    public void notifyEnd(Set<Integer> participants, Object payload) {
         byte[] data = GSON.toJson(payload).getBytes(StandardCharsets.UTF_8);
         // Un solo socket UDP riusato per tutti i destinatari (il `connect` ne
         // ridefinisce il remoto prima di ogni send). `connect` rende il send

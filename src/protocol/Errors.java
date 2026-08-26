@@ -1,7 +1,7 @@
-package server.protocol;
+package protocol;
 
 /**
- * Codici di errore CENTRALIZZATI.
+ * Codici di errore CENTRALIZZATI, condivisi tra server e client.
  *
  * Ogni risposta di errore del server passa da qui: niente stringhe hardcoded
  * sparse. `name()` è il codice inviato al client (es. "ERR_USER_NOT_FOUND");
