@@ -19,10 +19,14 @@
 ## CLIENT
 | ID | Componente | Stato | Note |
 |----|-----------|-------|------|
-| C1 | Client NIO (SocketChannel+Selector) | 🔴 | da fare (P2) |
-| C2 | Client UDP receiver | 🔴 | da fare (P2) |
-| C3 | Client CLI + render | 🔴 | da fare (P2) |
-| C4 | Client State holder | 🔴 | da fare (P2) |
+| C1 | Client NIO (`client.ClientConn`) | 🟢 | `SocketChannel`+`Selector`; `send()` **synchronized** serializza righe |
+| C2 | Client UDP (`client.UdpClient`) | 🟢 | bind effimera (porta nel login); `GAME_ENDED`→retry TCP su storico (TOCTOU) |
+| C3 | Client CLI (`client.Cli`+`ClientMain`) | 🟢 | 9 op + render; board/risultati/stats |
+| C4 | Client config (`client.ClientConfig`+`client.properties`) | 🟢 | `host`+`port`; UDP effimera |
+
+> **VERIFICA live riuscita**: register/login/info/me/leaders/stats/logout; submit CORRECT/WRONG
+> + penalità, MALFORMATO senza penalty; win→18pt finished; **UDP `GAME_ENDED` → auto-fetch storico**
+> (temi+esito) con retry. Reusa `protocol.Request`/`Response` (package condiviso) e `protocol.GameEnded` (POJO UDP).
 
 ## CONSEGNA (§4)
 - [ ] JAR server + JAR client (Main in `core.ServerMain` / `client.ClientMain`)

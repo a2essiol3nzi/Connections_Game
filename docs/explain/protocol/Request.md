@@ -1,9 +1,10 @@
 # `protocol/Request` — envelope di richiesta (client → server)
 
 ## Ruolo
-POJO Gson per deserializzare una riga JSON di richiesta (§5). La chiave
-`"operation"` è obbligatoria; tutti gli altri campi sono **opzionali** (Gson
-lascia `null` ciò che non è presente).
+POJO Gson **condiviso** tra client (serializza in `ClientConn.sendAndRetreive`)
+e server (`ClientHandler` deserializza) per una riga JSON di richiesta (§5). La
+chiave `"operation"` è obbligatoria; tutti gli altri campi sono **opzionali**
+(Gson lascia `null` ciò che non è presente).
 
 ## Campi
 | Campo | Tipo | Usato da |

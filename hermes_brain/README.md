@@ -3,8 +3,8 @@
 Progetto fine corso Reti/Lab III (A.A. 2025/26), versione specifica 1.1.
 Gioco "Connections" (NYT) implementato in **Java** con architettura **client-server**.
 
-> Stato repo: **server in sviluppo** (package `server.*`). Client (C1–C4) ancora da
-> fare (P2). Vedi `status.md` per la board componenti. Il file JSON delle 911 partite
+> Stato repo: **server + client completi e verificati**. Package `src/client/` (C1–C4)
+> implementati e testati end-to-end. Vedi `status.md` per la board. Il file JSON delle 911 partite
 > (~620KiB) è fornito dai docenti; in consegna va in `data/games.json`.
 
 ## Stack e vincoli tecnologici (da §3, ordinamento NUOVO)
@@ -34,7 +34,11 @@ Gioco "Connections" (NYT) implementato in **Java** con architettura **client-ser
 - `model/`: `GameData` (POJO partite).
 - `network/`: `ConnectionAcceptor`, `ClientHandler`, `GameScheduler`, `UdpNotifier`, `UdpRegistry`.
 - `persistence/`: `PersistenceThread` (utenti+storico).
-- `protocol/`: `Errors`, `Request`, `Response`.
+
+## Package condiviso (server + client)
+- `protocol/` (top-level in `src/`, non sotto `server/`): `Request`, `Response`,
+  `Errors` (envelope + codici), `GameEnded` (POJO notifica UDP). Il client non
+  dipende più da un package col nome "server" per i messaggi.
 
 ## Vincoli di naming (§4)
 - Classi con `main` → nome contenente `"Main"` (es. `ServerMain`, `ClientMain`).
@@ -56,5 +60,6 @@ Gioco "Connections" (NYT) implementato in **Java** con architettura **client-ser
 ## Convenzioni adottate qui
 - Lingua: italiano (match progetto/utente).
 - File di questo brain: `README.md` (indice), `status.md` (board),
-  `protocol.md` (messaggi/errori/storico), `gotchas.md` (insidie + dove pesa il lavoro).
+  `protocol.md` (messaggi/errori/storico), `gotchas.md` (insidie + dove pesa il lavoro),
+  `client.md` (piano client: package, thread, comandi, payload, insidie).
 - Documentazione per-file speculare in `docs/explain/server/` (1 `.md` per `.java`).

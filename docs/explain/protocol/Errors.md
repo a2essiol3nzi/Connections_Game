@@ -1,9 +1,10 @@
 # `protocol/Errors` — codici di errore centralizzati
 
 ## Ruolo
-Enum che centralizza i codici di errore (§5). Niente stringhe hardcoded.
-`name()` = codice inviato al client (es. `"ERR_USER_NOT_FOUND"`); `message` =
-spiegazione umana (in cima al JSON di errore).
+Enum che centralizza i codici di errore (§5), **condiviso tra server e client**
+(import `protocol.Errors`). Niente stringhe hardcoded. `name()` = codice inviato
+al client (es. `"ERR_USER_NOT_FOUND"`); `message` = spiegazione umana (in cima
+al JSON di errore).
 
 ## Codici definiti
 | Codice | Messaggio |

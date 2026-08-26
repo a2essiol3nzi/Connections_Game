@@ -6,6 +6,7 @@ import server.network.GameScheduler;
 import server.persistence.PersistenceThread;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
@@ -64,7 +65,7 @@ public class ServerMain {
         }));
 
         // 6) acceptor TCP sul thread principale
-        var pool = Executors.newFixedThreadPool(cfg.poolSize);
+        ExecutorService pool = Executors.newFixedThreadPool(cfg.poolSize);
         ConnectionAcceptor acceptor = new ConnectionAcceptor(cfg.tcpPort, pool, ctx);
         System.out.println("[Server] listening on TCP " + cfg.tcpPort + " (UDP " + cfg.udpPort + ")");
         acceptor.run();

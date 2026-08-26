@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
@@ -96,7 +97,7 @@ public class UserStore {
     // REGISTRAZIONE
     // Ritorna null in caso di successo, altrimenti un codice Errors.
     public Errors register(String username, String password) {
-        if (username == null || password == null || username.isBlank())
+        if (username == null || password == null || username.trim().isEmpty())
             return Errors.ERR_INVALID;
         synchronized (this) {
             if (nameToId.containsKey(username))
@@ -205,10 +206,10 @@ public class UserStore {
                 arr.add(o);
             }
         }
-        Path p = Path.of(persistFile);
-        if (p.getParent() != null) 
+        Path p = Paths.get(persistFile);
+        if (p.getParent() != null)
             Files.createDirectories(p.getParent());
-        Path tmp = Path.of(persistFile + ".tmp");
+        Path tmp = Paths.get(persistFile + ".tmp");
         try (BufferedWriter w = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
             GSON.toJson(arr, w);
         }
@@ -218,7 +219,7 @@ public class UserStore {
     // CARICAMENTO (all'avvio), esecuzione single threaded.
     // File utenti leggibile interamente. Ripristina id e nextId.
     private void load() {
-        Path p = Path.of(persistFile);
+        Path p = Paths.get(persistFile);
         if (!Files.exists(p)) { 
             System.err.println("[UserStore] file di load non trovato.");
             return;
@@ -251,7 +252,7 @@ public class UserStore {
         } catch (Exception e) {  // JsonSyntaxException, IllegalStateException, IOException -> tutte coperte
             System.err.println("[UserStore] load fallito (" + e.getMessage() + "), rinomino e parto vuoto");
             try {
-                Files.move(p, Path.of(persistFile + ".corrupt"), StandardCopyOption.REPLACE_EXISTING);
+                Files.move(p, Paths.get(persistFile + ".corrupt"), StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException ignored) {}
         }
     }

@@ -20,6 +20,7 @@ import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -462,10 +463,10 @@ public class GameManager {
     // PERSISTENZA STORICO
     public synchronized void persistHistory() throws IOException {
         JsonElement je = GSON.toJsonTree(history);
-        Path p = Path.of(historyFile);
+        Path p = Paths.get(historyFile);
         if (p.getParent() != null) 
             Files.createDirectories(p.getParent());
-        Path tmp = Path.of(historyFile + ".tmp");
+        Path tmp = Paths.get(historyFile + ".tmp");
         try (BufferedWriter w = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
             GSON.toJson(je, w);
         }
@@ -473,7 +474,7 @@ public class GameManager {
     }
 
     private void loadHistory() {
-        Path p = Path.of(historyFile);
+        Path p = Paths.get(historyFile);
         if (!Files.exists(p)) 
             return;
         try (BufferedReader r = Files.newBufferedReader(p, StandardCharsets.UTF_8)) {

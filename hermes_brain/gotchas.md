@@ -1,6 +1,9 @@
 # GOTCHAS & DECISIONI — Server Connections
 
 ## Regole ferree (vincoli progetto)
+- **Java 8** (target). `Makefile` compila con `--release 8`: vietato usare API/sintassi
+  Java 9+ (`var`, `List.of`, `Path.of`, `isBlank`, text block `"""`, …). Sotto JDK 21
+  le violazioni **non** danno errore senza `--release`, quindi vanno sempre compilate lì.
 - **Concorrenza**: solo `synchronized` / `wait()`/`notifyAll()` / `java.util.concurrent.atomic.*`.
   VIETATI `java.util.concurrent.locks.*` (ReentrantLock, ReadWriteLock, …).
 - **JSON**: GSON 2.11.0 (`lib/gson-2.11.0.jar`), non hand-rolled.
@@ -9,7 +12,7 @@
 - **File partite**: schema array top-level `[{"gameId":int,"groups":[{"theme":str,"words":[4]}]}]`;
   `theme` MAI al client live (finisce nello storico `groupInfo`, non nelle info live). ~620KiB fornito dai docenti.
 - **Persistenza**: JSON utenti **+ JSON storico partite**; periodica + atomica (tmp+rename). Due file separati.
-- **Naming**: classi con `main` contengono "Main" (§4). Sorgenti in `core/loader/model/network/persistence/protocol`.
+- **Naming**: classi con `main` contengono "Main" (§4). Sorgenti server in `core/loader/model/network/persistence`; messaggi condivisi in `protocol` (top-level).
 - **Config**: da `.properties`, NO CLI né interattivo.
 
 ## Scelte confermate (default doc PDF)
