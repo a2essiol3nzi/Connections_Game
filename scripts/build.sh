@@ -7,7 +7,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
 
 echo "================================"
-echo "🔨 Building Connections Server"
+echo "🔨 Building Connections Game"
 echo "================================"
 echo "Project: $PROJECT_ROOT"
 echo ""
@@ -35,7 +35,7 @@ echo "Packaging JARs..."
 if make dist/connections-server.jar > /dev/null 2>&1; then
     echo "✅ Server JAR: dist/connections-server.jar"
 else
-    echo "❌ JAR packaging failed!"
+    echo "❌ Server JAR packaging failed!"
     make dist/connections-server.jar
     exit 1
 fi
@@ -53,4 +53,6 @@ else
 fi
 
 echo ""
-echo "🚀 Ready to run with: make run (server) / make run-client (client)"
+echo "🚀 Ready to run:"
+echo "   Server: ./run-server.sh"
+echo "   Client: ./run-client.sh"
