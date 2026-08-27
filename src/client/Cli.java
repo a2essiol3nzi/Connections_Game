@@ -1,16 +1,19 @@
 package client;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.google.gson.Gson;
 import protocol.Request;
 import protocol.Response;
+import protocol.payload.GameInfoPayload;
+import protocol.payload.GameStatsPayload;
+import protocol.payload.GroupPayload;
+import protocol.payload.LeaderboardPayload;
+import protocol.payload.PlayerStatsPayload;
+import protocol.payload.SubmitPayload;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -32,6 +35,8 @@ public class Cli {
     private static final String GREEN  = "\u001b[32m";
     private static final String RED    = "\u001b[31m";
     private static final String YELLOW = "\u001b[33m";
+    // Gson per riconvertire il payload nel POJO di destinazione.
+    private static final Gson GSON = new Gson();
 
     private final ClientConn conn;
     private final int udpPort;
@@ -207,16 +212,14 @@ public class Cli {
         r.words = Arrays.asList(t[1], t[2], t[3], t[4]);
         Response res = sendAndRender(r);
         // in caso di partita finita (won/lost) si richiede anche Stats
-        if (res != null && 
-            "OK".equals(res.status) && 
-            res.payload != null && 
-            res.payload.has("game"))
-        {
-            JsonObject g = res.payload.getAsJsonObject("game");
-            boolean won = g.has("correct") && g.get("correct").getAsInt() >= 3;
-            boolean lost = g.has("errors") && g.get("errors").getAsInt() >= 4;
-            if (won || lost)
-                sendAndRender(req("requestGameStats"));
+        if (res != null && "OK".equals(res.status) && res.payload != null) {
+            SubmitPayload sp = payload(res, SubmitPayload.class);
+            if (sp.game != null) {
+                boolean won = sp.game.correct != null && sp.game.correct >= 3;
+                boolean lost = sp.game.errors != null && sp.game.errors >= 4;
+                if (won || lost)
+                    sendAndRender(req("requestGameStats"));
+            }
         }
     }
 
@@ -253,7 +256,7 @@ public class Cli {
                 System.out.println(RED + "✗ ERRORE [" + res.errorCode + "]: " + res.message + RESET);
                 return res;
             }
-            render(r.operation, res.payload);
+            render(r.operation, res);
             return res;
         } catch (IOException e) {
             System.out.println("[client] errore connessione: " + e.getMessage());
@@ -261,21 +264,26 @@ public class Cli {
         }
     }
 
-    private static void render(String op, JsonObject payload) {
+    // Riconverte il payload (Object deserializzato dal wire) nel POJO dell'operazione.
+    private static <T> T payload(Response res, Class<T> cls) {
+        return GSON.fromJson(GSON.toJson(res.payload), cls);
+    }
+
+    private static void render(String op, Response res) {
         switch (op) {
             case "login": case "requestGameInfo": 
-                renderGameInfo(payload); break;
+                renderGameInfo(payload(res, GameInfoPayload.class)); break;
             case "requestGameStats": 
-                renderGameStats(payload); break;
+                renderGameStats(payload(res, GameStatsPayload.class)); break;
             case "requestLeaderboard": 
-                renderLeaderboard(payload); break;
+                renderLeaderboard(payload(res, LeaderboardPayload.class)); break;
             case "requestPlayerStats": 
-                renderPlayerStats(payload); break;
+                renderPlayerStats(payload(res, PlayerStatsPayload.class)); break;
             case "submitProposal": {
-                String res = payload.get("result").getAsString();
-                String col = "CORRECT".equals(res) ? GREEN : RED;
-                System.out.println(col + BOLD + "  · " + res + RESET);
-                renderGameInfo(payload.getAsJsonObject("game"));
+                SubmitPayload sp = payload(res, SubmitPayload.class);
+                String col = "CORRECT".equals(sp.result) ? GREEN : RED;
+                System.out.println(col + BOLD + "  · " + sp.result + RESET);
+                renderGameInfo(sp.game);
                 break;
             }
             default: 
@@ -283,106 +291,99 @@ public class Cli {
         }
     }
 
-    // render di una partita (live o storico). Condiviso con UdpClient.
-    public static void renderGameInfo(JsonObject o) {
+    // Stesso sia per live che storico (condiviso con UdpClient).
+    public static void renderGameInfo(GameInfoPayload o) {
         if (o == null) { 
             System.out.println(DIM + "  (nessuna info)" + RESET); 
             return; 
         }
         section("PARTITA");
-        if (o.has("gameId")) {
-            System.out.print("  round " + CYAN + o.get("gameId").getAsInt() + RESET);
-            if (o.has("sourceGameId"))
-                System.out.print("   " + DIM + "(source " + o.get("sourceGameId").getAsInt() + ")" + RESET);
+        if (o.gameId != null) {
+            System.out.print("  round " + CYAN + o.gameId + RESET);
+            if (o.sourceGameId != null)
+                System.out.print("   " + DIM + "(source " + o.sourceGameId + ")" + RESET);
             System.out.println();
         }
-        if (o.has("remainingSec"))
-            System.out.println("  tempo rimanente: " + YELLOW + o.get("remainingSec").getAsInt() + "s" + RESET);
-        if (o.has("finished") && o.get("finished").getAsBoolean()) {
-            boolean won = o.has("correct") && o.get("correct").getAsInt() >= 3;
-            boolean lost = o.has("errors") && o.get("errors").getAsInt() >= 4;
+        if (o.remainingSec != null)
+            System.out.println("  tempo rimanente: " + YELLOW + o.remainingSec + "s" + RESET);
+        if (Boolean.TRUE.equals(o.finished)) {
+            boolean won = o.correct != null && o.correct >= 3;
+            boolean lost = o.errors != null && o.errors >= 4;
             if (won) {
                 System.out.println("  🏆 " + BOLD + GREEN + "HAI VINTO! Hai trovato tutti i gruppi." + RESET);
             } else if (lost) {
                 System.out.println("  ✖ " + BOLD + RED + "HAI PERSO: 4 errori." + RESET);
             } else {
                 // tempo scaduto senza vittoria/sconfitta
-                String scol = YELLOW;
-                System.out.println("  ⏱ " + BOLD + scol + "TEMPO SCADUTO — partita conclusa." + RESET);
+                System.out.println("  ⏱ " + BOLD + YELLOW + "TEMPO SCADUTO — partita conclusa." + RESET);
             }
         }
-        if (o.has("correct") || o.has("errors") || o.has("score")) {
+        if (o.correct != null || o.errors != null || o.score != null) {
             StringBuilder st = new StringBuilder();
-            if (o.has("correct")) st.append(GREEN).append("corrette: ").append(o.get("correct").getAsInt()).append(RESET).append("   ");
-            if (o.has("errors"))  st.append(RED).append("errori: ").append(o.get("errors").getAsInt()).append(RESET).append("   ");
-            if (o.has("score"))   st.append(CYAN).append("punteggio: ").append(o.get("score").getAsInt()).append(RESET);
-            // NB: NIENTE .trim() sulla stringa: toglie anche l'ESC iniziale (U+001B<=U+0020)
-            // spezzando il colore. Si costruisce senza spazi iniziali e si indentano qui.
-            System.out.println("  " + st.toString().replaceAll(" +$", ""));
+            if (o.correct != null) st.append(GREEN).append("corrette: ").append(o.correct).append(RESET).append("   ");
+            if (o.errors != null) st.append(RED).append("errori: ").append(o.errors).append(RESET).append("   ");
+            if (o.score != null) st.append(CYAN).append("punteggio: ").append(o.score).append(RESET);
+            // NB: NIENTE .trim() sulla stringa: toglie anche l'ESC iniziale (U+001B<=U+0020) rompendo il colore.
+            System.out.println("  " + st.toString().replaceAll(" +$", "")); // matcha uno o più spazi ( +) alla fine della stringa ($) e li rimuove
         }
-        if (o.has("remainingWords"))
-            renderBoard(o.getAsJsonArray("remainingWords"));
-        if (o.has("assignment")) {
+        if (o.remainingWords != null && !o.remainingWords.isEmpty())
+            renderBoard(o.remainingWords);
+        if (o.assignment != null) {
             section("SOLUZIONE");
-            for (JsonElement g : o.getAsJsonArray("assignment")) {
-                JsonObject grp = g.getAsJsonObject();
+            for (GroupPayload grp : o.assignment) {
                 StringBuilder ws = new StringBuilder();
-                for (JsonElement w : grp.getAsJsonArray("words")) ws.append(w.getAsString()).append(", ");
+                for (String w : grp.words) ws.append(w).append(", ");
                 String trail = ws.toString();
                 if (trail.endsWith(", ")) trail = trail.substring(0, trail.length() - 2);
-                System.out.println("  " + CYAN + BOLD + grp.get("theme").getAsString() + RESET + ": " + trail);
+                System.out.println("  " + CYAN + BOLD + grp.theme + RESET + ": " + trail);
             }
         }
     }
 
-    private static void renderGameStats(JsonObject o) {
+    private static void renderGameStats(GameStatsPayload o) {
         if (o == null) { 
             System.out.println(DIM + "  (nessuna statistica)" + RESET); 
             return; 
         }
         section("STATISTICHE PARTITA");
-        if (o.has("remainingSec"))
-            System.out.println("  tempo rimanente: " + YELLOW + o.get("remainingSec").getAsInt() + "s" + RESET);
-        System.out.println("  partecipanti: " + CYAN + o.get("participantsTotal").getAsInt() + RESET);
-        if (o.has("inProgress"))
-            System.out.println("  in corso:     " + YELLOW + o.get("inProgress").getAsInt() + RESET);
-        if (o.has("avgScore"))
-            System.out.println("  media:        " + CYAN + o.get("avgScore").getAsInt() + RESET);
-        System.out.println("  finiti:       " + o.get("finished").getAsInt()
-            + "   " + GREEN + "(vinti " + o.get("won").getAsInt() + ")" + RESET);
+        if (o.remainingSec != null)
+            System.out.println("  tempo rimanente: " + YELLOW + o.remainingSec + "s" + RESET);
+        System.out.println("  partecipanti: " + CYAN + o.participantsTotal + RESET);
+        if (o.inProgress != null)
+            System.out.println("  in corso:     " + YELLOW + o.inProgress + RESET);
+        if (o.avgScore != null)
+            System.out.println("  media:        " + CYAN + o.avgScore + RESET);
+        System.out.println("  finiti:       " + o.finished + "   " + GREEN + 
+            "(vinti " + o.won + ")" + RESET);
     }
 
-    private static void renderLeaderboard(JsonObject o) {
+    private static void renderLeaderboard(LeaderboardPayload o) {
         section("CLASSIFICA");
         int i = 1;
-        for (JsonElement e : o.getAsJsonArray("leaderboard")) {
-            JsonObject row = e.getAsJsonObject();
-            String name = row.get("username").getAsString();
-            int pts = row.get("cumulativeScore").getAsInt();
+        for (LeaderboardPayload.Row row : o.leaderboard) {
             String pre = i <= 3 ? YELLOW + BOLD : "";
-            System.out.println("  " + pre + String.format("%2d. %-20s %6d", i, name, pts) + RESET);
+            System.out.println("  " + pre + String.format("%2d. %-20s %6d", i, row.username, row.cumulativeScore) + RESET);
             i++;
         }
-        if (o.has("playerRank"))
-            System.out.println("  rango richiesto: " + CYAN + "#" + o.get("playerRank").getAsInt() + RESET);
+        if (o.playerRank != null)
+            System.out.println("  rango richiesto: " + CYAN + "#" + o.playerRank + RESET);
     }
 
-    private static void renderPlayerStats(JsonObject o) {
+    private static void renderPlayerStats(PlayerStatsPayload o) {
         section("STATISTICHE PERSONALI");
-        System.out.println("  Puzzles completed:  " + CYAN + o.get("puzzlesCompleted").getAsInt() + RESET);
-        System.out.println("  Win rate %:         " + GREEN + o.get("winRate").getAsInt() + RESET + "%");
-        System.out.println("  Loss rate %:        " + RED + o.get("lossRate").getAsInt() + RESET + "%");
-        System.out.println("  Current streak:     " + YELLOW + o.get("currentStreak").getAsInt() + RESET);
-        System.out.println("  Max streak:         " + YELLOW + o.get("maxStreak").getAsInt() + RESET);
-        System.out.println("  Perfect puzzles:    " + GREEN + o.get("perfectPuzzles").getAsInt() + RESET);
+        System.out.println("  Puzzles completed:  " + CYAN + o.puzzlesCompleted + RESET);
+        System.out.println("  Win rate %:         " + GREEN + o.winRate + RESET + "%");
+        System.out.println("  Loss rate %:        " + RED + o.lossRate + RESET + "%");
+        System.out.println("  Current streak:     " + YELLOW + o.currentStreak + RESET);
+        System.out.println("  Max streak:         " + YELLOW + o.maxStreak + RESET);
+        System.out.println("  Perfect puzzles:    " + GREEN + o.perfectPuzzles + RESET);
         // Istogramma errori: [0..3] vinte con 0..3 errori, [4] perse (4 errori), [5] non finite.
         // Etichette chiare sotto i valori (altrimenti l'istogramma è incomprensibile).
-        JsonArray h = o.getAsJsonArray("mistakeHistogram");
         String[] labels = {" 0 err", " 1 err", " 2 err", " 3 err", "persa", "non fin" };
         System.out.println("  Mistake histogram:");
         StringBuilder row = new StringBuilder("      ");
-        for (int i = 0; i < h.size(); i++)
-            row.append(GREEN).append(pad(String.valueOf(h.get(i).getAsInt()), 8)).append(RESET);
+        for (int x : o.mistakeHistogram)
+            row.append(GREEN).append(pad(String.valueOf(x), 8)).append(RESET);
         System.out.println(row.toString().trim());
         StringBuilder lab = new StringBuilder("      ");
         for (int i = 0; i < labels.length; i++)
@@ -415,10 +416,7 @@ public class Cli {
         System.out.println(CYAN + "└" + bar + "┘" + RESET);
     }
 
-    // Board dell'elenco parole (rimaste) disposto in una griglia colorata.
-    private static void renderBoard(JsonArray rem) {
-        List<String> list = new ArrayList<>();
-        for (JsonElement e : rem) list.add(e.getAsString());
+    private static void renderBoard(List<String> list) {
         if (list.isEmpty()) {
             System.out.println(DIM + "  (nessuna parola rimasta)" + RESET);
             return;

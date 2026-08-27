@@ -7,7 +7,9 @@
 Il client si compone di 4 nodi orchestrati da `ClientMain`: `Cli` (loop + resa
 TUI), `ClientConn` (TCP NIO, `sendAndRetreive()` synchronized), `UdpClient`
 (receiver notifiche), tutti collegati ai POJO condivisi di `protocol`
-(`Request`/`Response`/`Errors`/`GameEnded`). Il `UdpClient` riusa
+(`Request`/`Response`/`Errors`/`GameEnded`). Le risposte vengono riconvertite
+dal payload **`Object`** al POJO dell'operazione (`protocol.payload.*`) via un
+helper `payload(Response, Class)`. Il `UdpClient` riusa
 `ClientConn` per il fetch dell'esito (anti-TOCTOU) e `Cli.renderGameInfo`
 (statico) per la stampa.
 
@@ -26,7 +28,7 @@ Helper privati:
 - `rep(char c, int n)` — ripete `n` volte (target Java 8, niente `String.repeat`).
 - `pad(String, int)` — padding a destra.
 - `section(String title)` — intestazione in cornice colorata (58 colonne).
-- `renderBoard(JsonArray)` — parole residue in **griglia colorata** 4 colonne
+- `renderBoard(List<String>)` — parole residue in **griglia colorata** 4 colonne
   (calcola larghezza cella dal testo più lungo, min 6).
 
 ## Costanti colore ANSI
@@ -50,27 +52,38 @@ Legge righe da stdin; ogni comando ha un handler dedicato `cmd*`:
 
 `parseId` rende `-1` per i default; `-` nelle update indica "non cambiare".
 
-## `sendAndRender`
+## `sendAndRender` + helper `payload`
 `conn.sendAndRetreive(r)`; se `ERROR` stampa in **rosso** `✗ ERRORE
-[errorCode]: message`; altrimenti `render(op, payload)`. Su `IOException`
-stampa l'errore di connessione (non crasha).
+[errorCode]: message`; altrimenti `render(op, res)`. Su `IOException` stampa
+l'errore di connessione (non crasha).
+
+`payload(res, Class)` riconverte il payload (`Object` dal wire) nel POJO
+dell'operazione via `GSON.fromJson(GSON.toJson(res.payload), Class.class)`; il
+render dispatch sceglie la classe giusta in base all'operazione
+(`GameInfoPayload` / `GameStatsPayload` / `LeaderboardPayload` /
+`PlayerStatsPayload` / `SubmitPayload`).
 
 ## Render (pubblici, condivisi con UDP)
-- `renderGameInfo(JsonObject)` (**statico pubblico**, riusato dal UdpClient):
-  sezione `PARTITA` in cornice; round/source id (source in `DIM`), tempo in
-  `YELLOW`, esito `WON`/`LOST`/altro colorato (verde/rosso/giallo), correct/
-  errors/score colorati, `remainingWords` via `renderBoard` (griglia); se
-  `assignment` → sezione `SOLUZIONE` con tema in `CYAN BOLD`. La riga
+- `renderGameInfo(GameInfoPayload)` (**statico pubblico**, riusato dal
+  UdpClient): sezione `PARTITA` in cornice; round/source id (source in `DIM`),
+  tempo in `YELLOW`, esito `WON`/`LOST`/altro colorato (verde/rosso/giallo),
+  correct/errors/score colorati, `remainingWords` via `renderBoard` (griglia);
+  se `assignment` → sezione `SOLUZIONE` con `theme` in `CYAN BOLD`. La riga
   stats concatena i campi **senza spazi iniziali** e usa `replaceAll(" +$","")`
   (non `.trim()`) per non rompere l'ESC.
-- `renderGameStats` → sezione `STATISTICHE PARTITA`: partecipanti/corso/media/
-  finiti colorati.
-- `renderLeaderboard` → sezione `CLASSIFICA`: i primi 3 ranghi in `YELLOW BOLD`.
-- `renderPlayerStats` → sezione `STATISTICHE PERSONALI`: valori colorati
-  (verd/dim per rate et simili), `mistakeHistogram` in verde.
-- `submitProposal` → `result` colorato (`CORRECT` verde, altrimenti rosso) +
-  render della board aggiornata in `game`.
+- `renderGameStats(GameStatsPayload)` → sezione `STATISTICHE PARTITA`:
+  partecipanti/in corso/media/finiti colorati (con `remainingSec` live).
+- `renderLeaderboard(LeaderboardPayload)` → sezione `CLASSIFICA`: i primi 3
+  ranghi in `YELLOW BOLD`.
+- `renderPlayerStats(PlayerStatsPayload)` → sezione `STATISTICHE PERSONALI`:
+  valori colorati, `mistakeHistogram` con etichette (`0/1/2/3 err`, `persa`,
+  `non fin`).
+- `submitProposal` → `SubmitPayload.result` colorato (`CORRECT` verde, altro
+  rosso) + render della board aggiornata in `.game`. `cmdSubmit` inoltre
+  richiede `requestGameStats` alla prima submit che chiude la partita
+  (vittoria o sconfitta).
 
 ## Collegamenti
 - `client/ClientConn`: trasporto (`sendAndRetreive`).
 - `client/UdpClient`: usa `renderGameInfo` dopo una notifica.
+- `protocol/payload/*`: POJO del payload (riconversione con `payload(...)`).

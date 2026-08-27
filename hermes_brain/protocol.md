@@ -4,6 +4,12 @@ Tutti i messaggi sono **stringhe JSON**. Envelope risposta (formato adottato):
 `{"status":"OK", "payload":{...}}` oppure `{"status":"ERROR", "errorCode":"ERR_...", "message":"...", "payload":null}`.
 Lato server l'identificazione è per **userId immutabile** (non username).
 
+> REFACTOR payload: ogni risposta OK ha `payload` = un **POJO di
+> `protocol/payload/`** (`GameInfoPayload`, `GameStatsPayload`, ...), serializzato
+> dai mapper di `server/core/GameManager`. Il JSON emesso è identico a prima
+> (i campi `null` vengono omessi). Il tipo del payload è determinato
+> dall'operazione della richiesta.
+
 ## Richieste (client → server)
 | Op | Campi obbligatori | Note |
 |----|-------------------|------|

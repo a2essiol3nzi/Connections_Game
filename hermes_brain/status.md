@@ -14,14 +14,14 @@
 | S9 | Classifica+stats+storico (`core/GameManager`) | 🟢 | leaderboard (cumulative), game/player stats; **storico persistito** (`historyFile`, cap 10_000); `onlineUsers` auto-join; `submitProposal` **synchronized** (anti-TOCTOU); `logoutUser` atomico; `finalizeGame` **idempotente** (`compareAndSet`); verificato |
 | S10 | Persistenza (`persistence/PersistenceThread`) | 🟢 | persiste **utenti + storico** |
 | S11 | Protocollo errori (`protocol/Errors`) | 🟢 | enum centralizzato; `null`=OK; +`BAD_REQUEST`,`ERR_PLAYER_NOT_FOUND`,`ERR_ALREADY_LOGGED_IN` (login duplicato) |
-| S12 | Envelope (`protocol/Request`/`Response`) | 🟢 | `gameId=-1`⇒corrente; `requestGameInfo` storico espone `assignment`+tema; `Response.err(Errors)` con `message` |
+| S12 | Envelope (`protocol/Request`/`Response`) | 🟢 | `gameId=-1`⇒corrente; `requestGameInfo` storico espone `assignment`+tema; `Response.err(Errors)` con `message`. **Payload ora POJO** in `protocol/payload/` (per-op) |
 
 ## CLIENT
 | ID | Componente | Stato | Note |
 |----|-----------|-------|------|
 | C1 | Client NIO (`client.ClientConn`) | 🟢 | `SocketChannel`+`Selector`; `send()` **synchronized** serializza righe |
 | C2 | Client UDP (`client.UdpClient`) | 🟢 | bind effimera (porta nel login); `GAME_ENDED`→retry TCP su storico (TOCTOU) |
-| C3 | Client CLI (`client.Cli`+`ClientMain`) | 🟢 | 9 op + render; board/risultati/stats |
+| C3 | Client CLI (`client.Cli`+`ClientMain`) | 🟢 | 9 op + render; board/risultati/stats; payload riconvertiti in **POJO** (`protocol/payload`) via `Cli.payload(res,Class)` |
 | C4 | Client config (`client.ClientConfig`+`client.properties`) | 🟢 | `host`+`port`; UDP effimera |
 
 > **VERIFICA live riuscita**: register/login/info/me/leaders/stats/logout; submit CORRECT/WRONG

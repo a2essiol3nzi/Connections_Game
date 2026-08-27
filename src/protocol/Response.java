@@ -1,35 +1,33 @@
 package protocol;
 
-import com.google.gson.JsonObject;
-
 /**
  * Envelope di RISPOSTA dal server. Formato unico:
  *   {"status":"OK",     "payload":{...}}                                        in caso di successo
  *   {"status":"ERROR",  "errorCode":"ERR_...", "message":"...", "payload":null} in caso di errore
  *
- * I dati specifici dell'operazione vanno in `payload` (JsonObject arbitrario),
- * MAI un `errorCode` annidato nel payload. Gli errori usano l'enum
- * Errors: `Response.err(Errors.X)` imposta `errorCode`=name() e
- * `message`=message() dell'enum.
+ * `payload` è l'oggetto specifico dell'operazione (un POJO di `protocol.payload`): 
+ * il tipo del payload è determinato dall'operazione della richiesta. 
+ * MAI un `errorCode` annidato nel payload. Gli errori usano l'enum Errors: `Response.err(Errors.X)` 
+ * imposta `errorCode`=name() e `message`=message() dell'enum.
  */
 public class Response {
 
     public String status;      // "OK" | "ERROR"
     public String errorCode;   // presente solo se status == "ERROR"
     public String message;     // spiegazione umana (da Errors), solo su ERROR
-    public JsonObject payload;
+    public Object payload;     // POJO del payload
 
     public Response() {}
 
-    public Response(String status, String errorCode, String message, JsonObject payload) {
+    public Response(String status, String errorCode, String message, Object payload) {
         this.status = status;
         this.errorCode = errorCode;
         this.message = message;
         this.payload = payload;
     }
 
-    // Successo con payload opzionale.
-    public static Response ok(JsonObject payload) {
+    // Successo con payload opzionale (un POJO di protocol.payload, o null/empty).
+    public static Response ok(Object payload) {
         return new Response("OK", null, null, payload);
     }
 

@@ -1,7 +1,6 @@
 package server.network;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 
 import server.core.Context;
@@ -10,6 +9,11 @@ import server.core.ActiveGame;
 import protocol.Errors;
 import protocol.Request;
 import protocol.Response;
+import protocol.payload.GameInfoPayload;
+import protocol.payload.GameStatsPayload;
+import protocol.payload.LeaderboardPayload;
+import protocol.payload.PlayerStatsPayload;
+import protocol.payload.SubmitPayload;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -116,12 +120,12 @@ public class ClientHandler implements Runnable {
         switch (req.operation) {
             case "register": {
                 Errors r = ctx.users.register(req.username, req.psw);
-                return r == null ? Response.ok(new JsonObject()) : Response.err(r);
+                return r == null ? Response.ok(null) : Response.err(r);
             }
             case "updateCredentials": {
                 Errors r = ctx.users.updateCredentials(req.oldUsername, req.oldPsw,
                                                         req.newUsername, req.newPsw);
-                return r == null ? Response.ok(new JsonObject()) : Response.err(r);
+                return r == null ? Response.ok(null) : Response.err(r);
             }
             case "login": {
                 // Validazione: udpPort OBBLIGATORIO per ricevere notifiche di fine partita
@@ -160,30 +164,30 @@ public class ClientHandler implements Runnable {
                     return Response.err(Errors.ERR_NOT_LOGGED_IN);
                 ctx.games.logoutUser(loggedInUserId, ctx.udpRegistry);
                 loggedInUserId = null;
-                return Response.ok(new JsonObject());
+                return Response.ok(null);
             }
             case "submitProposal":{
                 return handleProposal(req.words);
             }
             case "requestGameInfo": {
                 int rid = roundIdOr(req.gameId, -1);
-                JsonObject info = ctx.games.gameInfo(loggedInUserId, rid, ctx.users);
+                GameInfoPayload info = ctx.games.gameInfo(loggedInUserId, rid, ctx.users);
                 if (info == null)
                     return Response.err(rid == -1 ? Errors.ERR_NO_ACTIVE_GAME : Errors.ERR_GAME_NOT_FOUND);
                 return Response.ok(info);
             }
             case "requestGameStats": {
-                JsonObject s = ctx.games.gameStats(roundIdOr(req.gameId, -1));
+                GameStatsPayload s = ctx.games.gameStats(roundIdOr(req.gameId, -1));
                 if (s == null) return Response.err(Errors.ERR_GAME_NOT_FOUND);
                 return Response.ok(s);
             }
             case "requestLeaderboard": {
-                JsonObject lb = ctx.games.leaderboard(req.playerName, req.topPlayers, ctx.users);
+                LeaderboardPayload lb = ctx.games.leaderboard(req.playerName, req.topPlayers, ctx.users);
                 if (lb == null) return Response.err(Errors.ERR_PLAYER_NOT_FOUND);
                 return Response.ok(lb);
             }
             case "requestPlayerStats": {
-                JsonObject ps = ctx.games.playerStats(loggedInUserId, ctx.users);
+                PlayerStatsPayload ps = ctx.games.playerStats(loggedInUserId, ctx.users);
                 if (ps == null) return Response.err(Errors.ERR_USER_NOT_FOUND);
                 return Response.ok(ps);
             }
@@ -197,9 +201,9 @@ public class ClientHandler implements Runnable {
         synchronized (ctx.games) {
             ActiveGame.SubmitResult r = ctx.games.submitProposal(loggedInUserId, words);
             if (r.isOk()) {
-                JsonObject p = new JsonObject();
-                p.addProperty("result", r.resultLabel());
-                p.add("game", ctx.games.gameInfo(loggedInUserId, -1, ctx.users));
+                SubmitPayload p = new SubmitPayload();
+                p.result = r.resultLabel();
+                p.game = ctx.games.gameInfo(loggedInUserId, -1, ctx.users);
                 return Response.ok(p);
             }
             return Response.err(r.error()); // mappato 1:1 sull'enum Errors

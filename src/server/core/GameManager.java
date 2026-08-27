@@ -2,12 +2,15 @@ package server.core;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.JsonIOException;
 
+import protocol.payload.GameInfoPayload;
+import protocol.payload.GameStatsPayload;
+import protocol.payload.GroupPayload;
+import protocol.payload.LeaderboardPayload;
+import protocol.payload.PlayerStatsPayload;
 import server.loader.GameLoader;
 import server.loader.GameLoader.CyclicGameIterator;
 import server.model.GameData;
@@ -193,64 +196,53 @@ public class GameManager {
      *   roundId != -1 -> partita CONCLUSA (storico): assignment corretto (16->4,
      *                    tema incluso) + correct/errors/score del giocatore.
      */
-    public JsonObject gameInfo(int userId, int roundId, UserStore store) {
-        JsonObject o = new JsonObject();
+    public GameInfoPayload gameInfo(int userId, int roundId, UserStore store) {
+        GameInfoPayload p = new GameInfoPayload();
         if (roundId == -1) {
             ActiveGame g = current();
             if (g == null) 
                 return null; // -> ERR_NO_ACTIVE_GAME (handler)
-            o.addProperty("gameId", g.roundId);
-            o.addProperty("sourceGameId", g.gameId);
-            long remain = Math.max(0, (g.endTimeMs - System.currentTimeMillis()) / 1000);
-            o.addProperty("remainingSec", remain);
+            p.gameId = g.roundId;
+            p.sourceGameId = g.gameId;
+            p.remainingSec = (int) Math.max(0, (g.endTimeMs - System.currentTimeMillis()) / 1000);
             PlayerState ps = g.getState(userId);
             if (ps != null) {
                 synchronized (ps) {
-                    o.addProperty("correct", ps.correctCount);
-                    o.addProperty("errors", ps.errorCount);
-                    o.addProperty("score", ps.score());
-                    o.addProperty("finished", ps.finished);
-                    List<String> remaining = new ArrayList<>(g.shuffledWords);
-                    remaining.removeAll(g.wordsOfFoundGroups(ps));
-                    JsonArray rem = new JsonArray();
-                    for (String w : remaining) 
-                        rem.add(w);
-                    o.add("remainingWords", rem);
+                    p.correct = ps.correctCount;
+                    p.errors = ps.errorCount;
+                    p.score = ps.score();
+                    p.finished = ps.finished;
+                    p.remainingWords = new ArrayList<>(g.shuffledWords);
+                    p.remainingWords.removeAll(g.wordsOfFoundGroups(ps));
                 }
             }
-            return o;
+            return p;
         }
         // storico
         GameHistory h = history.get(roundId);
         if (h == null) 
             return null; // -> ERR_GAME_NOT_FOUND (handler)
-        o.addProperty("gameId", h.roundId);
-        o.addProperty("sourceGameId", h.sourceGameId);
-        o.addProperty("finished", true);
-        JsonArray groups = new JsonArray();
+        p.gameId = h.roundId;
+        p.sourceGameId = h.sourceGameId;
+        p.finished = true;
+        p.assignment = new ArrayList<>();
         for (GameData.Group grp : h.groups) {
-            JsonObject g = new JsonObject();
-            g.addProperty("theme", grp.theme);
-            JsonArray ws = new JsonArray();
-            for (String w : grp.words) 
-                ws.add(w);
-            g.add("words", ws);
-            groups.add(g);
+            GroupPayload gp = new GroupPayload();
+            gp.theme = grp.theme;
+            gp.words = grp.words;
+            p.assignment.add(gp);
         }
-        o.add("assignment", groups);
-        // risoluzione per id immutabile (chiave dello storico): lo userId non
-        // cambia alla rinomina, quindi la richiesta resta valida anche dopo rename.
-        UserStore.User u = store.getById(userId);
+        UserStore.User u = store.getById(userId); // risoluzione per id immutabile (chiave dello storico)
         if (u == null) 
             return null; // -> ERR_GAME_NOT_FOUND (handler)
         HistoryEntry he = h.entries.get(u.id);
         if (he != null) {
-            o.addProperty("correct", he.correct);
-            o.addProperty("errors", he.errors);
-            o.addProperty("score", he.score);
-            o.addProperty("outcome", he.outcome);
+            p.correct = he.correct;
+            p.errors = he.errors;
+            p.score = he.score;
+            p.outcome = he.outcome;
         }
-        return o;
+        return p;
     }
 
     /**
@@ -258,8 +250,8 @@ public class GameManager {
      *   roundId == -1 -> partita in corso: conteggi LIVE (in corso / finiti / vinti).
      *   roundId != -1 -> da `history` (partecipanti, vinti, media).
      */
-    public JsonObject gameStats(int roundId) {
-        JsonObject o = new JsonObject();
+    public GameStatsPayload gameStats(int roundId) {
+        GameStatsPayload p = new GameStatsPayload();
         if (roundId == -1) {
             ActiveGame g = current();
             if (g == null) 
@@ -279,12 +271,12 @@ public class GameManager {
                     else inProgress++;
                 }
             }
-            o.addProperty("participantsTotal", parts.size());
-            o.addProperty("inProgress", inProgress);
-            o.addProperty("finished", finished);
-            o.addProperty("won", won);
-            o.addProperty("remainingSec", Math.max(0, (g.endTimeMs - System.currentTimeMillis()) / 1000));
-            return o;
+            p.participantsTotal = parts.size();
+            p.inProgress = inProgress;
+            p.finished = finished;
+            p.won = won;
+            p.remainingSec = (int) Math.max(0, (g.endTimeMs - System.currentTimeMillis()) / 1000);
+            return p;
         }
         // storico
         GameHistory h = history.get(roundId);
@@ -296,21 +288,20 @@ public class GameManager {
             if ("WON".equals(e.outcome))
                 w++;
         }
-        o.addProperty("participantsTotal", cnt);
-        o.addProperty("finished", cnt);
-        o.addProperty("won", w);
-        o.addProperty("avgScore", cnt == 0 ? 0 : sum / cnt);
-        return o;
+        p.participantsTotal = cnt;
+        p.finished = cnt;
+        p.won = w;
+        p.avgScore = cnt == 0 ? 0 : sum / cnt;
+        return p;
     }
 
     // Classifica: utenti per punteggio cumulativo; opz. rango di uno. Rank sulla lista COMPLETA.
-    // NOTA: Snapshot dei (id, score) è "fotografa sfocata" - colti con lock granulare su
+    // NOTA: Snapshot dei (id, score) è una "fotografia sfocata" - colti con lock granulare su
     // user singoli, non globale. Tra la lettura di Alice e Bob, finalizeGame() potrebbe
-    // aggiornare stats. Questo è ACCETTABILE: leaderboard è read-only, weak consistency
-    // è tollerabile. Evita bottleneck di serializzazione con finalizeGame().
-    public JsonObject leaderboard(String playerName, Integer topK, UserStore store) {
-        JsonObject o = new JsonObject();
-        JsonArray arr = new JsonArray();
+    // aggiornare stats. Questo è ACCETTABILE: leaderboard è read-only. 
+    // Evita bottleneck di serializzazione con finalizeGame().
+    public LeaderboardPayload leaderboard(String playerName, Integer topK, UserStore store) {
+        LeaderboardPayload p = new LeaderboardPayload();
         List<UserStore.User> all = new ArrayList<>(store.allUsers());
         int targetId = -1;
         if (playerName != null) {
@@ -318,18 +309,13 @@ public class GameManager {
             if (t != null) 
                 targetId = t.id;
         }
-        // Snapshot dei (id, score) con lock granulare su user singoli.
-        // NOTA: Non esiste lock globale con finalizeGame() - la leaderboard è una
-        // "fotografia sfocata" colta in istanti diversi per ogni user. Tra la lettura
-        // di Alice e Bob, finalizeGame() potrebbe aggiornare stat. Ma questo è ACCETTABILE
-        // per una read-only query.
         List<int[]> rows = new ArrayList<>();
         for (UserStore.User u : all) {
             synchronized (u) {
                 rows.add(new int[]{ u.id, u.cumulativeScore });
             }
         }
-        // Sort e calcolo rank DOPO aver colto snapshot coerente
+        // sort e calcolo rank DOPO aver colto snapshot coerente
         rows.sort((a, b) -> Integer.compare(b[1], a[1]));
         int rank = -1;
         for (int i = 0; i < rows.size(); i++) {
@@ -338,40 +324,35 @@ public class GameManager {
                 break;
             }
         }
-        // Costruisci risposta
+        // costruisci risposta
+        p.leaderboard = new ArrayList<>();
         int lim = (topK != null) ? Math.min(topK, rows.size()) : rows.size();
         for (int i = 0; i < lim; i++) {
             int[] r = rows.get(i);
             UserStore.User u = store.getById(r[0]);
-            JsonObject e = new JsonObject();
-            if (u == null) {
-                e.addProperty("username", "");
-            } else {
-                synchronized (u) {
-                    e.addProperty("username", u.username);
-                }
+            LeaderboardPayload.Row row = new LeaderboardPayload.Row();
+            synchronized (u) {
+                row.username = (u == null) ? "" : u.username;
             }
-            e.addProperty("cumulativeScore", r[1]);
-            arr.add(e);
+            row.cumulativeScore = r[1];
+            p.leaderboard.add(row);
         }
-        o.add("leaderboard", arr);
         if (playerName != null) {
             if (targetId == -1) return null; // -> ERR_PLAYER_NOT_FOUND (handler)
-            o.addProperty("playerRank", rank);
+            p.playerRank = rank;
         }
-        return o;
+        return p;
     }
 
     // Statistiche personali NYT-style. Identificazione per userId immutabile
     // (importante: una rinomina durante la partita non ne invalida l'accesso).
-    // Ritorna null se l'utente non esiste.
-    public JsonObject playerStats(int userId, UserStore store) {
+    public PlayerStatsPayload playerStats(int userId, UserStore store) {
         UserStore.User u = store.getById(userId);
         if (u == null) 
             return null;
-        JsonObject o = new JsonObject();
+        PlayerStatsPayload p = new PlayerStatsPayload();
         synchronized (u) {
-            // Snapshot atomico di tutti i campi sotto lock per evitare dirty read
+            // snapshot atomico di tutti i campi sotto lock per evitare dirty read
             int played = u.puzzlesPlayed;
             int won = u.puzzlesWon;
             int lost = u.puzzlesLost;
@@ -380,20 +361,16 @@ public class GameManager {
             int perfectPuzzles = u.perfectPuzzles;
             int[] mistakeHist = new int[u.mistakeHist.length];
             System.arraycopy(u.mistakeHist, 0, mistakeHist, 0, u.mistakeHist.length);
-            
-            // Calcoli sulla snapshot (sotto lock, coerenti)
-            o.addProperty("puzzlesCompleted", played);
-            o.addProperty("winRate", played == 0 ? 0 : (100 * won / played));
-            o.addProperty("lossRate", played == 0 ? 0 : (100 * lost / played));
-            o.addProperty("currentStreak", currentStreak);
-            o.addProperty("maxStreak", maxStreak);
-            o.addProperty("perfectPuzzles", perfectPuzzles);
-            JsonArray hist = new JsonArray();
-            for (int x : mistakeHist)
-                hist.add(x);
-            o.add("mistakeHistogram", hist);
+            // calcoli sulla snapshot (sotto lock, coerenti)
+            p.puzzlesCompleted = played;
+            p.winRate = played == 0 ? 0 : (100 * won / played);
+            p.lossRate = played == 0 ? 0 : (100 * lost / played);
+            p.currentStreak = currentStreak;
+            p.maxStreak = maxStreak;
+            p.perfectPuzzles = perfectPuzzles;
+            p.mistakeHistogram = mistakeHist;
         }
-        return o;
+        return p;
     }
 
     // A fine partita: chiude la partita, registra esiti in storico e aggiorna UserStore.

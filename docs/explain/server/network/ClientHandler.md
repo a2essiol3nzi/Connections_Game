@@ -38,12 +38,17 @@ requestGameStats / requestLeaderboard / requestPlayerStats richiedono login ⇒
 - `default` ⇒ `UNKNOWN_OPERATION`.
 
 ## `handleProposal`
-`synchronized(ctx.games)` attorno a `submitProposal` + `gameInfo` (serializza con
-`rotate`). `SubmitResult.isOk()` ⇒ payload `{result, game}`; altrimenti
-`Response.err(r.error())` (mappato 1:1 sull'enum `Errors`).
+`cases` → `synchronized(ctx.games)` attorno a `submitProposal` + `gameInfo`
+(serializza con `rotate`). `SubmitResult.isOk()` ⇒ payload `SubmitPayload`
+`{result, game}` (`game` = `GameInfoPayload` dello stato aggiornato);
+altrimenti `Response.err(r.error())` (mappato 1:1 sull'enum `Errors`).
+Lato client, un `submit` che porta a vittoria/sconfitta (`correct>=3` o
+`errors>=4`) triggera anche una `requestGameStats` (vedi `client/Cli.cmdSubmit`).
 
 ## Collegamenti
 - `protocol/Request`, `protocol/Response`: envelope.
+- `protocol/payload/*`: tipi del payload (GameInfo/GameStats/Leaderboard/
+  PlayerStats/Submit).
 - `core/Context`: `users`, `games`, `udpRegistry`.
-- `core/GameManager`: operazioni per userId.
+- `core/GameManager`: operazioni per userId (ritornano i `*Payload`).
 - `network/UdpRegistry`: registra/rimuove endpoint.

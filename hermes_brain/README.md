@@ -39,6 +39,12 @@ Gioco "Connections" (NYT) implementato in **Java** con architettura **client-ser
 - `protocol/` (top-level in `src/`, non sotto `server/`): `Request`, `Response`,
   `Errors` (envelope + codici), `GameEnded` (POJO notifica UDP). Il client non
   dipende più da un package col nome "server" per i messaggi.
+- `protocol/payload/` (REFACTOR, commit `6ed47c1`): **un POJO per ogni payload
+  di risposta** (`GameInfoPayload`, `GameStatsPayload`, `LeaderboardPayload`,
+  `PlayerStatsPayload`, `SubmitPayload`, `GroupPayload`), al posto di
+  `JsonObject` costruiti/spostati a mano. `Response.payload` è `Object`; il
+  tipo è deciso dall'operazione. Il wire JSON NON cambia (i `null` sono omessi
+  da Gson). Lato client, `Cli.payload(res, Class)` lo riconverte nel POJO.
 
 ## Vincoli di naming (§4)
 - Classi con `main` → nome contenente `"Main"` (es. `ServerMain`, `ClientMain`).

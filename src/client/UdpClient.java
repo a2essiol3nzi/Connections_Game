@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import protocol.Request;
 import protocol.Response;
 import protocol.GameEnded;
+import protocol.payload.GameInfoPayload;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -79,7 +80,7 @@ public class UdpClient implements Runnable, AutoCloseable {
                     return;
                 }
                 System.out.println("=== ESITO PARTITA round " + roundId + " ===");
-                Cli.renderGameInfo(r.payload);
+                Cli.renderGameInfo(GSON.fromJson(GSON.toJson(r.payload), GameInfoPayload.class));
                 System.out.println("========================================");
                 return;
             } catch (IOException e) { // per abbandono o altro

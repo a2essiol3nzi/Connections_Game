@@ -45,3 +45,13 @@
 - Commenti estesi OK; lui li sintetizzerà. Mantenere filosofia di scrittura attuale.
 - Password in chiaro: semplificazione voluta (non focalizza sicurezza).
 - Id utente immutabile (consiglio prof): `<id,User>` primaria + `<username,id>` indice; `getById` per risoluzione stabile.
+
+## Refactor payload POJO (convenzione)
+- `protocol/payload/` contiene UN POJO per ogni risposta OK; `Response.payload` è
+  **`Object`** (il tipo è determinato dall'operazione). Gson emette i `null` come
+  assenti ⇒ **il wire JSON è invariato** rispetto al precedente `JsonObject`.
+- Lato client non si leggono più le chiavi con `.get("...")`: si riconverte il
+  payload col POJO dell'operazione (`GSON.fromJson(GSON.toJson(res.payload), Cls.class)` —
+  vedi `client/Cli.payload`).
+- Mai fare cast diretto `(GameInfoPayload) res.payload`: il payload è un `Object`
+  deserializzato da Gson senza tipo, serve la riconversione esplicita.

@@ -27,16 +27,20 @@ storico PERSISTITO** e aggiorna le statistiche (`UserStore`).
 - `join(userId)`, `submitProposal(userId, words)` — `submitProposal` è
   **`synchronized`** (serializza con `rotate`, evita TOCTOU tra `current()` e
   `submit()`).
-- `gameInfo(userId, roundId, store)` — `roundId==-1` ⇒ corrente (live: id,
-  `sourceGameId`, `remainingSec`, stato, `remainingWords`); `roundId!=-1` ⇒
-  storico (`assignment`+tema + esito del giocatore). Ritorna `null` su errore
-  (handler → `ERR_NO_ACTIVE_GAME`/`ERR_GAME_NOT_FOUND`).
-- `gameStats(roundId)` — live (in corso/finiti/vinti) o da `history` (media).
-- `leaderboard(playerName, topK, store)` — snapshot `(id,score)` con lock
-  granulare per utente, **sort + rank DOPO** lo snapshot; weak consistency
-  accettata (read-only). `null` se `playerName` inesistente ⇒ `ERR_PLAYER_NOT_FOUND`.
-- `playerStats(userId, store)` — snapshot di TUTTI i campi (+copia `mistakeHist`)
-  sotto `synchronized(u)` per evitare dirty read. `null` ⇒ `ERR_USER_NOT_FOUND`.
+- `gameInfo(userId, roundId, store)` → **`GameInfoPayload`** —
+  `roundId==-1` ⇒ corrente (live: id, `sourceGameId`, `remainingSec`, stato,
+  `remainingWords`); `roundId!=-1` ⇒ storico (`assignment`+tema + esito del
+  giocatore). Ritorna `null` su errore (handler →
+  `ERR_NO_ACTIVE_GAME`/`ERR_GAME_NOT_FOUND`).
+- `gameStats(roundId)` → **`GameStatsPayload`** — live (in corso/finiti/vinti +
+  `remainingSec`) o da `history` (media).
+- `leaderboard(playerName, topK, store)` → **`LeaderboardPayload`** — snapshot
+  `(id,score)` con lock granulare per utente, **sort + rank DOPO** lo snapshot;
+  weak consistency accettata (read-only). `null` se `playerName` inesistente ⇒
+  `ERR_PLAYER_NOT_FOUND`.
+- `playerStats(userId, store)` → **`PlayerStatsPayload`** — snapshot di TUTTI i
+  campi (+copia `mistakeHistogram`) sotto `synchronized(u)` per evitare dirty
+  read. `null` ⇒ `ERR_USER_NOT_FOUND`.
 - `finalizeGame(store)` — **idempotente** (`finalized.compareAndSet(false,true)`):
   sigilla, scrive `GameHistory` (chiave userId), aggiorna statistiche utente.
 - `persistHistory()` / `loadHistory()` — JSON atomico (tmp+`ATOMIC_MOVE`);
@@ -52,6 +56,8 @@ tra utenti diversi (snapshot sfocata accettabile per query read-only). Solo
 `synchronized`/`Atomic*`/`ConcurrentHashMap` (NO `locks.*`).
 
 ## Collegamenti
+- `protocol/payload/*`: tipi di ritorno (`GameInfoPayload`, `GameStatsPayload`,
+  `LeaderboardPayload`, `PlayerStatsPayload`).
 - `core/ActiveGame`/`PlayerState`: crea e interroga.
 - `loader/GameLoader` + `CyclicGameIterator`: sorgente.
 - `core/UserStore`: storico per userId, statistiche.

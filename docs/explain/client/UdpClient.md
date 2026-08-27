@@ -26,7 +26,8 @@ mandato al server nel `login` come `udpPort`.
 - Invia `requestGameInfo` (roundId) via `ClientConn.sendAndRetreive`.
 - `ERR_GAME_NOT_FOUND` ⇒ storico non ancora finalizzato ⇒ `sleep(RETRY_DELAY_MS)`
   e riprova (fino a `MAX_RETRY`).
-- OK ⇒ stampa esito con `Cli.renderGameInfo(r.payload)`.
+- OK ⇒ stampa esito con `Cli.renderGameInfo(GameInfoPayload)` (il payload
+  `Object` viene riconvertito con `GSON.fromJson(GSON.toJson(r.payload), GameInfoPayload.class)`).
 - `ERR_...` ≠ not-found ⇒ esito non disponibile; `IOException` ⇒ abbandona.
 
 `MAX_RETRY=10`, `RETRY_DELAY_MS=200` (~2s coprono la finestra TOCTOU).
@@ -35,4 +36,5 @@ mandato al server nel `login` come `udpPort`.
 - `client/ClientConn`: `sendAndRetreive()` per il fetch dell'esito (lock condiviso).
 - `client/Cli`: `renderGameInfo` per la stampa; riceve `udpPort` per il login.
 - `protocol/GameEnded`: POJO per deserializzare il segnale.
+- `protocol/payload/GameInfoPayload`: tipo del payload dell'esito.
 - `server/network/GameScheduler`/`UdpNotifier`: fonte del segnale.
