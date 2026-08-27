@@ -10,7 +10,7 @@ infine apre l'acceptor TCP sul thread principale (bloccante).
 1. **Config** — `ServerConfig.load(path)`; `path` = `args[0]` o `"server.properties"`.
    Errore di lettura → `System.exit(2)`.
 2. **Loader partite** — `new GameLoader(cfg.gamesFile)` (streaming Gson, O(1)).
-   Errore → `System.exit(3)`.
+   Errore → `System.exit(3)`. Log: `[Server] prepared <total> games from <file>`.
 3. **Risorse condivise** — `new Context(cfg, loader)` (crea store/manager/registry UDP/notifier).
 4. **Thread supporto** — `GameScheduler` (games/users/notifier) e `PersistenceThread`
    (users/**games**/intervalSec): entrambi avviati come `Thread`.

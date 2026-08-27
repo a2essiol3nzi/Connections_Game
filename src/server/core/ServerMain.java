@@ -44,7 +44,7 @@ public class ServerMain {
             System.exit(3);
             return;
         }
-        System.out.println("[Server] loaded " + loader.total() + " games from " + cfg.gamesFile);
+        System.out.println("[Server] prepared " + loader.total() + " games from " + cfg.gamesFile);
 
         // 3) risorse condivise
         Context ctx = new Context(cfg, loader);

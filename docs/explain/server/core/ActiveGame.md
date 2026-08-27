@@ -11,12 +11,23 @@ i `theme` restano lato server.
 | `gameId` | int | id sorgente (si ripete al wrap del loader ciclico) |
 | `roundId` | int | id **UNIVOCO** di questa esecuzione (monotono) |
 | `startTimeMs` / `endTimeMs` | long | finestra di gioco |
-| `groups` | `List<ThemeGroup>` | 4 gruppi {theme, `Set<words>`}; **immutabili** dopo il costruttore |
+| `groups` | `List<ThemeGroup>` | 4 gruppi {theme, `Set<words>`, `Set<wordsLower>`}; **immutabili** dopo il costruttore |
 | `shuffledWords` | `List<String>` | 16 parole in ordine casuale (immutabile) |
+| `boardLower` | `Set<String>` | tutte le parole in **minuscolo** (validazione case-insensitive) |
 | `finalized` | `AtomicBoolean` | `true` dopo la finalizzazione |
 | `players` | `ConcurrentHashMap<Integer,PlayerState>` | chiave = **userId** |
 
-Inner `ThemeGroup { theme, Set<String> words }` (runtime; distinto da `GameData.Group`).
+Inner `ThemeGroup { theme, Set<String> words, Set<String> wordsLower }` (runtime;
+distinto da `GameData.Group`). `wordsLower` = variante minuscola di `words` per
+il **confronto case-insensitive** (`ciao == CIAO`); le parole ORIGINALI restano in
+`words`, usate per l'invio al client e per lo storico. `boardLower` = minuscole
+di tutta la board (`lowerOf(new HashSet<>(all))`). Helper `lowerOf(Collection)` →
+`Set` di `toLowerCase(Locale.ROOT)`.
+
+## Validazione proposta (case-insensitive)
+Le proposte e i confronti avvengono sulle **maiuscole lower** (`wordsLower`/
+`boardLower`): una proposta con maiuscole diverse dalle parole sorgenti viene
+riconosciuta come partita dal gioco. [OK_FOUND vs OK_WRONG](../../../hermes_brain/gotchas.md)
 
 ## Enum esito
 - `JoinResult { OK, ERR_FINISHED, ERR_NO_ACTIVE_GAME }` — ogni costante porta
@@ -35,6 +46,9 @@ Inner `ThemeGroup { theme, Set<String> words }` (runtime; distinto da `GameData.
   ri-check di `finalized` dentro il lock (anti-TOCTOU). Esiti: `OK_FOUND`
   (+1 corretto, a 3 ⇒ finished), `OK_WRONG` (+1 errore, a 4 ⇒ finished),
   `ERR_MALFORMED` (nessun impatto), `ERR_FINISHED`/`ERR_NOTJOINED`.
+  **Det. parola-già-usata**: usato `!Collections.disjoint(proposed,
+  group.words)` (intersezione non vuota) invece di `containsAll` — così basta
+  UNA parola già utilizzata in un gruppo per marcare la proposta malformata.
 - `groupInfo()` → `GameData.Group[]` (tema+parole) per lo storico.
 - `wordsOfFoundGroups(ps)` — `synchronized(ps)` (groups immutabili).
 - `getState`, `participants()`, `outcomeOf(ps)` (`synchronized(ps)`).

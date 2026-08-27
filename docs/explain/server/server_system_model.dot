@@ -1,0 +1,70 @@
+digraph Server {
+  rankdir=LR;
+  graph [bgcolor=white, fontname="Inter, Arial, Helvetica, sans-serif", splines=true, dpi=96,
+         nodesep=1.2, ranksep=1.4, pad="0.6,0.6", labelloc="t"];
+  node  [fontname="Inter, Arial, Helvetica, sans-serif", shape=box, style="rounded,filled",
+         fontsize=12, margin=0.25];
+  edge  [fontname="Inter, Arial, Helvetica, sans-serif", fontsize=10, color="#555555",
+         arrowsize=0.8, minlen=2, labeldistance=2.5];
+
+  // ===== THREAD main: wiring + acceptor =====
+  subgraph cluster_main {
+    label="THREAD 1 · main (1)"; fontsize=13; fontcolor="#7b4a0e"; style="rounded,filled";
+    fillcolor="#fdf6e3"; color="#d68910";
+    Main   [label="ServerMain\n(main()) wiring", fillcolor="#ffffff", color="#d68910", fontcolor="#7b4a0e"];
+    Accept [label="ConnectionAcceptor\naccept() loop", fillcolor="#ffffff", color="#d68910", fontcolor="#111827"];
+    Main -> Accept [label="avvia (stesso thread)", style=dashed, color="#999999"];
+  }
+
+  // ===== THREAD 2 · scheduler =====
+  subgraph cluster_sched {
+    label="THREAD 2 · scheduler (1)"; fontsize=13; fontcolor="#92400e"; style="rounded,filled";
+    fillcolor="#fdf6e3"; color="#d97706";
+    Sched [label="GameScheduler\nsleep → finalizeGame → persist\n→ UDP notifyEnd → rotate", fillcolor="#ffffff", color="#d97706", fontcolor="#111827"];
+  }
+
+  // ===== THREAD 3 · persist =====
+  subgraph cluster_persist {
+    label="THREAD 3 · persist (1)"; fontsize=13; fontcolor="#92400e"; style="rounded,filled";
+    fillcolor="#fdf6e3"; color="#d97706";
+    Persist [label="PersistenceThread\ntimer 30s → users.persist()\n+ persistHistory()", fillcolor="#ffffff", color="#d97706", fontcolor="#111827"];
+  }
+
+  // ===== THREAD POOL: N ClientHandler (separato da main/sched) =====
+  subgraph cluster_pool {
+    label="THREAD POOL · N ClientHandler (N)"; fontsize=13; fontcolor="#075985"; style="rounded,filled";
+    fillcolor="#e0f2fe"; color="#0284c7";
+    Pool [label="ThreadPool\nN × ClientHandler\n1 socket / handler\n(gestisce login/submit/richieste)", fillcolor="#ffffff", color="#0284c7", fontcolor="#075985"];
+    Main -> Pool [label="submit() nuove connessioni"];
+  }
+
+  // ===== OGGETTO CONDIVISO (stato) =====
+  subgraph cluster_shared {
+    label="OGGETTO CONDIVISO tra i thread (lock)"; fontsize=12; fontcolor="#166534";
+    style="rounded,filled,dashed"; fillcolor="#f0fdf4"; color="#16a34a";
+    GM     [label="GameManager\ncurrent · history (CHM) · onlineUsers\nnextRoundId (Atomic)\nfinalize idemp · submit/login sync", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
+    Store  [label="UserStore\nbyId · nameToId (CHM)\npersist() synchronized (3 fonti)", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
+    Active [label="ActiveGame\nplayers (CHM) · finalized\nsubmit lock su PlayerState", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
+    Loader [label="GameLoader\nGson stream O(1)\nCyclicIterator", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
+    Reg    [label="UdpRegistry\nuserId → addr:port (CHM)", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
+    GM -> Store  [label="stats update"];
+    GM -> Active [label="rotate / esiti"];
+    GM -> Loader [label="games.next()"];
+    GM -> Reg    [label="logoutUser"];
+  }
+
+  // ===== archi verso lo stato condiviso (lock) =====
+  Accept -> GM   [label="ClientHandler per-conn"];
+  Pool   -> GM    [label="register/login · submit/join"];
+  Pool   -> Store [label="getState"];
+  Pool   -> Active [label="submit/join"];
+
+  Sched  -> GM    [label="finalizeGame / rotate"];
+  Sched  -> Store [label="users.persist()", constraint=false];
+  Sched  -> Reg   [label="notifyEnd (segnale)"]; // scheduler legge endpoint dal UdpRegistry
+
+  Persist-> Store [label="users.persist()"];
+  Persist-> GM    [label="persistHistory()", constraint=false];
+  Main   -> Sched [style=dotted] // avvio
+  Main   -> Persist [style=dotted]
+}

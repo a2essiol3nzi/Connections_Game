@@ -16,6 +16,11 @@ prosegue (non chiude la sessione). `dispatch` → `Response` + `\n` + flush.
 `IOException` ⇒ disconnessione; `catch(Exception)` ⇒ logga e chiude pulito (NPE
 da race non uccide il worker del pool).
 
+**`finally` (disconnessione per QUALSIASI causa)** — client chiuso, ^C/processo
+killed, o eccezione: risolve il `username` (o `userId N`) tramite
+`ctx.users.getById`, esegue `logoutUser(id, udpRegistry)` e logga
+`[Server] client disconnesso: <username> da <IP>`.
+
 ## `dispatch` — 9 operazioni
 Gate auth centralizzato (`requiresAuth`): submitProposal / requestGameInfo /
 requestGameStats / requestLeaderboard / requestPlayerStats richiedono login ⇒

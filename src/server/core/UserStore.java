@@ -221,7 +221,8 @@ public class UserStore {
     private void load() {
         Path p = Paths.get(persistFile);
         if (!Files.exists(p)) { 
-            System.err.println("[UserStore] file di load non trovato.");
+            // Primo avvio: nessun file preesistente -> parte vuoto. Il file verrà
+            // creato e popolato al primo salvataggio (persist del timer/scheduler).
             return;
         }
         try (BufferedReader r = Files.newBufferedReader(p, StandardCharsets.UTF_8)) {

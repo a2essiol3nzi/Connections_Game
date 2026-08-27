@@ -4,6 +4,7 @@ import server.model.GameData;
 import protocol.Errors;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -11,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Locale;
 import java.util.Random;
 
 /**
@@ -40,12 +42,19 @@ public class ActiveGame {
     private final Map<Integer, PlayerState> players = new ConcurrentHashMap<>();
 
     // Struttura di RUNTIME interna: parole in Set<String> per match senza ordine in submit().
-    // Distinta da GameData.Group.
+    // Distinta da GameData.Group. `wordsLower` è la variante minuscola per il
+    // confronto case-insensitive (ciao == CIAO); le parole ORIGINALI restano in
+    // `words`, usate per l'invio al client e per lo storico.
     private static final class ThemeGroup {
         final String theme;
-        final Set<String> words;
+        final Set<String> words;        // parole originali (come nel file)
+        final Set<String> wordsLower;   // stesse parole in minuscolo (per il confronto)
 
-        ThemeGroup(String theme, Set<String> words) { this.theme = theme; this.words = words; }
+        ThemeGroup(String theme, Set<String> words) {
+            this.theme = theme;
+            this.words = words;
+            this.wordsLower = lowerOf(words);
+        }
     }
 
     public ActiveGame(GameData src, long nowMs, long durationMs, Random rnd, int roundId) {
@@ -61,6 +70,18 @@ public class ActiveGame {
         }
         Collections.shuffle(all, rnd);
         this.shuffledWords = Collections.unmodifiableList(all);
+        this.boardLower = lowerOf(new HashSet<>(all));
+    }
+
+    // Tutte le parole della board in minuscolo (per validare proposte case-insensitive).
+    private final Set<String> boardLower;
+
+    // Converte una raccolta di stringhe nel relativo set di minuscole.
+    private static Set<String> lowerOf(Collection<String> words) {
+        Set<String> out = new HashSet<>(words.size());
+        for (String w : words) 
+            out.add(w.toLowerCase(Locale.ROOT));
+        return out;
     }
 
     // Esito di una partecipazione. 
@@ -137,11 +158,12 @@ public class ActiveGame {
             return SubmitResult.ERR_NOTJOINED;
         if ((words == null) || (words.size() != 4)) 
             return SubmitResult.ERR_MALFORMED;
-        Set<String> proposed = new HashSet<>(words);
+        Set<String> proposed = new HashSet<>(words.size());
+        for (String w : words) proposed.add(w.toLowerCase(Locale.ROOT)); // case-insensitive
         if (proposed.size() != 4) 
             return SubmitResult.ERR_MALFORMED; // duplicati
         for (String w : proposed)
-            if (!shuffledWords.contains(w)) 
+            if (!boardLower.contains(w)) 
                 return SubmitResult.ERR_MALFORMED; // parola non proposta
         synchronized (ps) {
             // Richeck finalized (potrebbe essere cambiato tra step 1 e ora)
@@ -150,10 +172,10 @@ public class ActiveGame {
             if (ps.finished) 
                 return SubmitResult.ERR_FINISHED;
             for (int gi : ps.foundGroups)
-                if (proposed.containsAll(groups.get(gi).words))  // parola già usata 
+                if (!Collections.disjoint(proposed, groups.get(gi).wordsLower)) // parola già usata
                     return SubmitResult.ERR_MALFORMED;
             for (int gi = 0; gi < groups.size(); gi++) {
-                if (proposed.equals(groups.get(gi).words)) { // gruppo corretto
+                if (proposed.equals(groups.get(gi).wordsLower)) { // gruppo corretto
                     if (!ps.foundGroups.contains(gi)) { // gruppo nuovo
                         ps.foundGroups.add(gi);
                         ps.correctCount++;

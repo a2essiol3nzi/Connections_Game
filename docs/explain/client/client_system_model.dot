@@ -1,0 +1,42 @@
+digraph Client {
+  rankdir=LR;
+  graph [bgcolor="white", fontname="Inter, Arial, Helvetica, sans-serif", splines=true, dpi=96,
+         nodesep=1.2, ranksep=1.4, pad="0.6,0.6", labeljust="l"];
+  node  [fontname="Inter, Arial, Helvetica, sans-serif", shape=box, style="rounded,filled",
+         fontsize=12, margin=0.25, height=0, width=0];
+  edge  [fontname="Inter, Arial, Helvetica, sans-serif", fontsize=10, color="#555555",
+         arrowsize=0.8, labeldistance=2.5, labelangle=0, minlen=2];
+
+  // ===== CLUSTER: THREAD main =====
+  subgraph cluster_main {
+    label="THREAD 1 · main (1)"; fontsize=13; fontcolor="#7b4a0e"; style="rounded,filled";
+    fillcolor="#fdf6e3"; color="#d68910"; sep="+0.8"; labelloc="t";
+    Main [label="ClientMain\n(main())", fillcolor="#ffffff", color="#d68910", fontcolor="#7b4a0e"];
+    CLI  [label="Cli.run()  ← stdin loop\n1) build Request\n2) sendAndRetreive()\n3) render TUI (ANSI)\n\n(stesso thread main)",
+          fillcolor="#ffffff", color="#d68910", fontcolor="#111827"];
+    Main -> CLI [style=dashed, color="#999999", label="avvia loop", labeltooltip="stesso thread"];
+  }
+
+  // ===== CLUSTER: thread udp =====
+  subgraph cluster_udp {
+    label="THREAD 2 · \"udp\" (1)"; fontsize=13; fontcolor="#075985"; style="rounded,filled";
+    fillcolor="#e0f2fe"; color="#0284c7"; padt="+1"; padl="+1"; padr="+1"; padb="+1";
+    UDP  [label="UdpClient (receiver)  NUOVO THREAD\n  DatagramSocket effimero (0)\n  attesa GAME_ENDED\n  → fetch esito via ClientConn",
+          fillcolor="#ffffff", color="#0284c7", fontcolor="#075985"];
+  }
+
+  // ===== CLUSTER: oggetto condiviso =====
+  subgraph cluster_shared {
+    label="OGGETTO CONDIVISO tra i 2 thread (lock)"; fontsize=12; fontcolor="#166534";
+    style="rounded,filled,dashed"; fillcolor="#f0fdf4"; color="#16a34a"; pad="+1";
+    Conn  [label="ClientConn (NIO)\nSocketChannel + Selector\nsendAndRetreive() synchronized", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
+    Proto [label="protocol\nRequest · Response\nErrors · GameEnded", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
+    Conn -> Proto [label="Gson", color="#16a34a"];
+  }
+
+  // ===== archi tra i thread =====
+  Main -> UDP [label="new Thread(udp,\"udp\").start()"];
+  CLI -> Conn [label="sendAndRetreive()\n(lock condiviso)"];
+  UDP -> Conn [label="sendAndRetreive()\nrequestGameInfo(roundId)\n(stesso lock)"];
+  UDP -> CLI [label="Cli.renderGameInfo()\n(statico, stateless)", color="#888888", style=dashed];
+}

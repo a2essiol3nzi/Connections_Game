@@ -34,8 +34,10 @@ dopo rinomina in partita); `getByName` è `synchronized` sullo store.
 - `persist()` — **`synchronized`** su store + `synchronized(u)` per utente:
   chiamato da TRE fonti (PersistenceThread, GameScheduler post-finalize,
   shutdown hook) → serializza scrittura su `file.tmp` + `ATOMIC_MOVE`.
-- `load()` (privato) — file assente ⇒ messaggio; corrotto (catch `Exception`) ⇒
-  rinominato `.corrupt`, partenza vuota.
+- `load()` (privato) — file assente (primo avvio) ⇒ **parte vuoto in silenzio**
+  (niente log: il file viene creato/popolato al primo persist del
+  timer/scheduler); corrotto (catch `Exception`) ⇒ rinominato `.corrupt`,
+  partenza vuota.
 
 ## SEMPLIFICAZIONE PASSWORD
 Salvate **in chiaro** (scelta consapevole). In produzione → hash+salt.

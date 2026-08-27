@@ -73,16 +73,25 @@ public class ClientHandler implements Runnable {
                 out.flush();
             }
         } catch (IOException e) {
-            // client disconnesso
+            // TCP EOF / reset: il client ha chiuso la connessione senza logout.
+            // La pulizia (logout implicito) avviene nel finally qui sotto.
         } catch (Exception e) {
             // nessuna eccezione inattesa deve terminare il thread handler:
             // logga e chiude pulito senza far morire il worker del pool.
             System.err.println("[ClientHandler] eccezione inattesa: " + e);
         } finally {
-            // logout implicito alla chiusura: rimuove dal registry online e UDP (ATOMICO).
+            // Disconnessione per QUALSIASI causa (client chiuso, ^C/processo killed,
+            // o eccezione). Il worker del pool torna subito disponibile al ritorno
+            // dal run().
+            String who = "non autenticato";
             if (loggedInUserId != null) {
+                UserStore.User u = ctx.users.getById(loggedInUserId);
+                who = (u != null) ? u.username : ("userId " + loggedInUserId);
+                // logout implicito: rimuove da onlineUsers e deregistra l'endpoint UDP.
                 ctx.games.logoutUser(loggedInUserId, ctx.udpRegistry);
             }
+            System.out.println("[Server] client disconnesso: " + who
+                + " da " + socket.getInetAddress().getHostAddress());
             loggedInUserId = null;
         }
     }
@@ -99,7 +108,11 @@ public class ClientHandler implements Runnable {
                             || req.operation.equals("requestPlayerStats");
         if ((requiresAuth) && (loggedInUserId == null))
             return Response.err(Errors.ERR_NOT_LOGGED_IN);
-
+        // Client già loggato non può registrarsi né rifare login su un altro account. 
+        // (l'account precedente resterebbe "online" per il server)
+        boolean isAuth = req.operation.equals("register") || req.operation.equals("login");
+        if (isAuth && loggedInUserId != null)
+            return Response.err(Errors.ERR_ALREADY_LOGGED_IN);
         switch (req.operation) {
             case "register": {
                 Errors r = ctx.users.register(req.username, req.psw);

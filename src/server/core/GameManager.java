@@ -53,7 +53,7 @@ import java.util.Random;
  */
 public class GameManager {
 
-    private static final Gson GSON = new GsonBuilder().create();
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final int HISTORY_CAP = 10_000;
 
     private final GameLoader loader;          // sorgente partite PIGRO
@@ -283,6 +283,7 @@ public class GameManager {
             o.addProperty("inProgress", inProgress);
             o.addProperty("finished", finished);
             o.addProperty("won", won);
+            o.addProperty("remainingSec", Math.max(0, (g.endTimeMs - System.currentTimeMillis()) / 1000));
             return o;
         }
         // storico
