@@ -2,6 +2,7 @@ package protocol.payload;
 
 // Risposta a requestPlayerStats: statistiche personali in stile NYT.
 public class PlayerStatsPayload {
+    public String username; // account a cui si riferiscono le statistiche
     public int puzzlesCompleted;
     public int winRate; // percentuale (0-100)
     public int lossRate; // percentuale (0-100)

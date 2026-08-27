@@ -41,7 +41,7 @@ public class Cli {
     private final ClientConn conn;
     private final int udpPort;
 
-    private String loggedIn = null; // username di login (evita "login shadowing")
+    private boolean loggedIn = false; // client loggato? (l'username si chiede al server via "me")
 
     public Cli(ClientConn conn, int udpPort) {
         this.conn = conn;
@@ -59,6 +59,7 @@ public class Cli {
             + "  " + CYAN + "stats" + RESET + "    [roundId]                 statistiche partita\n"
             + "  " + CYAN + "leaders" + RESET + "  [ -k N | -name X ]         classifica (default: tutti)\n"
             + "  " + CYAN + "me" + RESET + "       statistiche personali\n"
+            + "  " + CYAN + "clear" + RESET + "                    ripulisci lo schermo\n"
             + "  " + CYAN + "quit" + RESET + "/" + CYAN + "exit" + RESET + "                   chiudi il client\n"
             + "  " + CYAN + "help" + RESET + "                     mostra questo aiuto\n");
     }
@@ -69,8 +70,7 @@ public class Cli {
         printHelp();
         String line;
         while (true) {
-            System.out.print(CYAN + BOLD + ">> " + RESET);
-            System.out.flush();
+            printPrompt();
             line = in.readLine(); // legge user input
             if (line == null) break;
             if (!dispatch(line.trim()))
@@ -84,8 +84,8 @@ public class Cli {
             return true;
         String[] t = line.split("\\s+"); // spazi bianchi consecutivi (spazio, tab, newline, ecc.)
         // Se già loggati, non si può né registrarsi né rifare login.
-        if ((loggedIn != null) && (t[0].equals("register") || t[0].equals("login"))) {
-            System.out.println(YELLOW + "Già loggato come '" + loggedIn + "' - fai prima logout." + RESET);
+        if (loggedIn && (t[0].equals("register") || t[0].equals("login"))) {
+            System.out.println(YELLOW + "Già loggato - fai prima logout." + RESET);
             return true;
         }
         switch (t[0]) {
@@ -127,6 +127,10 @@ public class Cli {
             }
             case "me": { 
                 cmdMe(t);
+                return true; 
+            }
+            case "clear": {
+                cmdClear(); 
                 return true; 
             }
             case "quit": case "exit": return false;
@@ -192,7 +196,7 @@ public class Cli {
         r.udpPort = udpPort; // porta UDP per notif async
         Response res = sendAndRender(r);
         if (res != null && "OK".equals(res.status))
-            loggedIn = user;
+            loggedIn = true;
     }
 
     private void cmdLogout(String[] t) {
@@ -200,7 +204,7 @@ public class Cli {
         sendAndRender(req("requestGameStats"));
         Response res = sendAndRender(req("logout"));
         if (res != null && "OK".equals(res.status))
-            loggedIn = null; // il client torna "anonimo" solo a logout eseguito
+            loggedIn = false; // il client torna "anonimo" solo a logout eseguito
     }
 
     private void cmdSubmit(String[] t) {
@@ -248,6 +252,18 @@ public class Cli {
         sendAndRender(r);
     }
 
+    // Ripulisce lo schermo (ANSI: clear + home).
+    private void cmdClear() {
+        System.out.print("\u001b[2J\u001b[H");
+        System.out.flush();
+    }
+
+    // Stampa il prompt di input. Usato anche da UdpClient.
+    static void printPrompt() {
+        System.out.print(CYAN + BOLD + ">> " + RESET);
+        System.out.flush();
+    }
+
     // --- INVIO+RENDER ---
     private Response sendAndRender(Request r) {
         try {
@@ -269,7 +285,7 @@ public class Cli {
         return GSON.fromJson(GSON.toJson(res.payload), cls);
     }
 
-    private static void render(String op, Response res) {
+    private void render(String op, Response res) {
         switch (op) {
             case "login": case "requestGameInfo": 
                 renderGameInfo(payload(res, GameInfoPayload.class)); break;
@@ -324,7 +340,8 @@ public class Cli {
             if (o.errors != null) st.append(RED).append("errori: ").append(o.errors).append(RESET).append("   ");
             if (o.score != null) st.append(CYAN).append("punteggio: ").append(o.score).append(RESET);
             // NB: NIENTE .trim() sulla stringa: toglie anche l'ESC iniziale (U+001B<=U+0020) rompendo il colore.
-            System.out.println("  " + st.toString().replaceAll(" +$", "")); // matcha uno o più spazi ( +) alla fine della stringa ($) e li rimuove
+            // Regexp: matcha uno o più spazi ( +) alla fine della stringa ($) e li rimuove
+            System.out.println("  " + st.toString().replaceAll(" +$", "")); 
         }
         if (o.remainingWords != null && !o.remainingWords.isEmpty())
             renderBoard(o.remainingWords);
@@ -371,6 +388,9 @@ public class Cli {
 
     private static void renderPlayerStats(PlayerStatsPayload o) {
         section("STATISTICHE PERSONALI");
+        // L'username arriva dal server (campo del payload), non è gestito lato client.
+        if (o.username != null)
+            System.out.println("  " + CYAN + "utente: " + o.username + RESET);
         System.out.println("  Puzzles completed:  " + CYAN + o.puzzlesCompleted + RESET);
         System.out.println("  Win rate %:         " + GREEN + o.winRate + RESET + "%");
         System.out.println("  Loss rate %:        " + RED + o.lossRate + RESET + "%");
@@ -384,11 +404,11 @@ public class Cli {
         StringBuilder row = new StringBuilder("      ");
         for (int x : o.mistakeHistogram)
             row.append(GREEN).append(pad(String.valueOf(x), 8)).append(RESET);
-        System.out.println(row.toString().trim());
+        System.out.println(row.toString().replaceAll(" +$", ""));
         StringBuilder lab = new StringBuilder("      ");
         for (int i = 0; i < labels.length; i++)
             lab.append(DIM).append(pad(labels[i], 8)).append(RESET);
-        System.out.println(lab.toString().trim());
+        System.out.println(lab.toString().replaceAll(" +$", ""));
     }
 
     // --- Metodi per stile TUI ---

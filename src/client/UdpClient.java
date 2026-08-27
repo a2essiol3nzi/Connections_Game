@@ -77,11 +77,13 @@ public class UdpClient implements Runnable, AutoCloseable {
                         continue;
                     }
                     System.out.println("\tesito non disponibile: " + r.errorCode);
+                    Cli.printPrompt(); // ridisegna prompt
                     return;
                 }
                 System.out.println("=== ESITO PARTITA round " + roundId + " ===");
                 Cli.renderGameInfo(GSON.fromJson(GSON.toJson(r.payload), GameInfoPayload.class));
                 System.out.println("========================================");
+                Cli.printPrompt();
                 return;
             } catch (IOException e) { // per abbandono o altro
                 System.out.println("[udp] connessione TCP chiusa, abbandono");
@@ -91,6 +93,7 @@ public class UdpClient implements Runnable, AutoCloseable {
             }
         }
         System.out.println("\tesito non ancora pronto dopo " + MAX_RETRY + " tentativi");
+        Cli.printPrompt();
     }
 
     @Override 

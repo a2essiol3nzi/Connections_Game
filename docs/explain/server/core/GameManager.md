@@ -28,12 +28,12 @@ storico PERSISTITO** e aggiorna le statistiche (`UserStore`).
   **`synchronized`** (serializza con `rotate`, evita TOCTOU tra `current()` e
   `submit()`).
 - `gameInfo(userId, roundId, store)` → **`GameInfoPayload`** —
-  `roundId==-1` ⇒ corrente (live: id, `sourceGameId`, `remainingSec`, stato,
-  `remainingWords`); `roundId!=-1` ⇒ storico (`assignment`+tema + esito del
-  giocatore). Ritorna `null` su errore (handler →
+  `roundId==-1` (default) **o round corrente** ⇒ live (id, `sourceGameId`,
+  `remainingSec`, stato, `remainingWords`); `roundId` = altro round ⇒ storico
+  (`assignment`+tema + esito del giocatore). Ritorna `null` su errore (handler →
   `ERR_NO_ACTIVE_GAME`/`ERR_GAME_NOT_FOUND`).
-- `gameStats(roundId)` → **`GameStatsPayload`** — live (in corso/finiti/vinti +
-  `remainingSec`) o da `history` (media).
+- `gameStats(roundId)` → **`GameStatsPayload`** — `-1` o round corrente ⇒ live
+  (in corso/finiti/vinti + `remainingSec`); altro ⇒ da `history` (media).
 - `leaderboard(playerName, topK, store)` → **`LeaderboardPayload`** — snapshot
   `(id,score)` con lock granulare per utente, **sort + rank DOPO** lo snapshot;
   weak consistency accettata (read-only). `null` se `playerName` inesistente ⇒

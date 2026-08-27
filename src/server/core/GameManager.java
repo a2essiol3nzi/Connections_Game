@@ -191,17 +191,15 @@ public class GameManager {
 
     /**
      * Info partita:
-     *   roundId == -1 -> partita CORRENTE (live): id, tempo rimanente, stato del
-     *                    giocatore richiesto, parole rimaste.
-     *   roundId != -1 -> partita CONCLUSA (storico): assignment corretto (16->4,
-     *                    tema incluso) + correct/errors/score del giocatore.
+     *   roundId == -1 (default) O roundId corrente -> partita CORRENTE (live): 
+     *                    id, tempo rimanente, stato del giocatore richiesto, parole rimaste.
+     *   roundId != -1 e != corrente -> partita CONCLUSA (storico): assignment
+     *                    corretto (16->4, tema incluso) + correct/errors/score.
      */
     public GameInfoPayload gameInfo(int userId, int roundId, UserStore store) {
         GameInfoPayload p = new GameInfoPayload();
-        if (roundId == -1) {
-            ActiveGame g = current();
-            if (g == null) 
-                return null; // -> ERR_NO_ACTIVE_GAME (handler)
+        ActiveGame g = currentFor(roundId);
+        if (g != null) {
             p.gameId = g.roundId;
             p.sourceGameId = g.gameId;
             p.remainingSec = (int) Math.max(0, (g.endTimeMs - System.currentTimeMillis()) / 1000);
@@ -218,6 +216,8 @@ public class GameManager {
             }
             return p;
         }
+        if (roundId == -1)
+            return null; // -> ERR_NO_ACTIVE_GAME (handler)
         // storico
         GameHistory h = history.get(roundId);
         if (h == null) 
@@ -247,15 +247,14 @@ public class GameManager {
 
     /**
      * Statistiche aggregate della partita.
-     *   roundId == -1 -> partita in corso: conteggi LIVE (in corso / finiti / vinti).
-     *   roundId != -1 -> da `history` (partecipanti, vinti, media).
+     *   roundId == -1 (default) O roundId corrente -> conteggi LIVE
+     *                    (in corso / finiti / vinti + remainingSec).
+     *   roundId != -1 e != corrente -> da `history` (partecipanti, vinti, media).
      */
     public GameStatsPayload gameStats(int roundId) {
         GameStatsPayload p = new GameStatsPayload();
-        if (roundId == -1) {
-            ActiveGame g = current();
-            if (g == null) 
-                return null; // -> ERR_GAME_NOT_FOUND (handler)
+        ActiveGame g = currentFor(roundId);
+        if (g != null) {
             int inProgress = 0, finished = 0, won = 0;
             Set<Integer> parts = g.participants();
             for (int u : parts) {
@@ -278,6 +277,8 @@ public class GameManager {
             p.remainingSec = (int) Math.max(0, (g.endTimeMs - System.currentTimeMillis()) / 1000);
             return p;
         }
+        if (roundId == -1)
+            return null; // -> ERR_GAME_NOT_FOUND (handler)
         // storico
         GameHistory h = history.get(roundId);
         if (h == null) 
@@ -293,6 +294,15 @@ public class GameManager {
         p.won = w;
         p.avgScore = cnt == 0 ? 0 : sum / cnt;
         return p;
+    }
+
+    // Risolve la partita corrente per una richiesta: `current` se roundId è il default
+    // (-1) o coincide col roundId della partita attiva, null in caso contrario (-> storico).
+    private ActiveGame currentFor(int roundId) {
+        ActiveGame g = current();
+        if (g == null) 
+            return null;
+        return (roundId == -1 || roundId == g.roundId) ? g : null;
     }
 
     // Classifica: utenti per punteggio cumulativo; opz. rango di uno. Rank sulla lista COMPLETA.
@@ -353,6 +363,7 @@ public class GameManager {
         PlayerStatsPayload p = new PlayerStatsPayload();
         synchronized (u) {
             // snapshot atomico di tutti i campi sotto lock per evitare dirty read
+            p.username = u.username; // nome corrente (sotto lock, dopo rinomina)
             int played = u.puzzlesPlayed;
             int won = u.puzzlesWon;
             int lost = u.puzzlesLost;
