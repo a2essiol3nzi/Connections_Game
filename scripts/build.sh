@@ -4,7 +4,7 @@
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$PROJECT_ROOT"
+cd "$PROJECT_ROOT"/.. # usciamo dalla dir di scripts
 
 echo "================================"
 echo "🔨 Building Connections Game"
@@ -32,27 +32,16 @@ fi
 
 echo ""
 echo "Packaging JARs..."
-if make dist/connections-server.jar > /dev/null 2>&1; then
+if make jar > /dev/null 2>&1; then
     echo "✅ Server JAR: dist/connections-server.jar"
+    echo "✅ Client JAR: dist/connections-client.jar"
 else
-    echo "❌ Server JAR packaging failed!"
-    make dist/connections-server.jar
+    echo "❌ JAR packaging failed!"
+    make jar
     exit 1
-fi
-
-if [ -d src/client ]; then
-    if make dist/connections-client.jar > /dev/null 2>&1; then
-        echo "✅ Client JAR: dist/connections-client.jar"
-    else
-        echo "❌ Client JAR packaging failed!"
-        make dist/connections-client.jar
-        exit 1
-    fi
-else
-    echo "ℹ️  Client non ancora implementato: JAR client saltato"
 fi
 
 echo ""
 echo "🚀 Ready to run:"
-echo "   Server: ./run-server.sh"
-echo "   Client: ./run-client.sh"
+echo "   Server: scripts/run-server.sh"
+echo "   Client: scripts/run-client.sh"

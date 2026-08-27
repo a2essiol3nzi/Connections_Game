@@ -1,51 +1,46 @@
-# Makefile - compilazione server Connections (Java)
-# Uso:  make          (compila in out/)
-#       make dist     (compila + crea JAR in dist/)
-#       make run      (compila + lancia server.core.ServerMain)
-#       make run-client (compila + lancia client.ClientMain, quando esiste)
-#       make clean    (rimuove out/ e dist/)
+# Makefile — compila ed esegue la Connections Game (server + client)
+#
+# Comandi:
+#   make            compila tutto in out/
+#   make run        compila e avvia il SERVER (server.core.ServerMain)
+#   make run-client compila e avvia il CLIENT (client.ClientMain)
+#   make jar        compila e crea i JAR in dist/ (server + client)
+#   make clean      cancella out/ e dist/
 
-JAVAC  := javac
-JAVA   := java
-JAR    := jar
-SRC    := src
-OUT    := out
-DIST   := dist
-LIB    := lib/gson-2.11.0.jar
-CP     := $(OUT):$(LIB)
-MAIN   := server.core.ServerMain
-CLIENT_MAIN := client.ClientMain
-# --release 8: vincola sorgente + API alla versione 8 (requisito progetto)
-RELEASE := --release 8
+JAVAC := javac
+JAVA  := java
+JAR   := jar
+SRC   := src
+OUT   := out
+DIST  := dist
+LIB   := lib/gson-2.11.0.jar
+CP    := $(OUT):$(LIB)
+
+# Tutte le sorgenti Java del progetto
 SOURCES := $(shell find $(SRC) -name '*.java')
 
-$(OUT)/.stamp: $(SOURCES)
-	$(JAVAC) $(RELEASE) -cp '$(CP)' -d $(OUT) $(SOURCES)
-	touch $@
+# Compila in out/
+compile:
+	mkdir -p $(OUT)
+	$(JAVAC) --release 8 -cp '$(CP)' -d $(OUT) $(SOURCES)
 
-all: $(OUT)/.stamp
-
-# JAR server (thin): gson resta in lib/, allegato a parte
-# Nota: Class-Path è relativo alla posizione del JAR (dist/) -> ../lib/
-dist/connections-server.jar: all
+# Un JAR = un file .class raggruppato, per lanciarlo con `java -jar`.
+# Il "manifest" dice: main class da avviare e dove trovare gson 
+# (che resta fuori, in lib/).
+jar: compile
 	mkdir -p $(DIST)
-	printf 'Main-Class: $(MAIN)\nClass-Path: ../$(LIB)\n' > $(OUT)/manifest.txt
-	$(JAR) --create --file $@ --manifest=$(OUT)/manifest.txt -C $(OUT) .
+	printf 'Main-Class: server.core.ServerMain\nClass-Path: ../$(LIB)\n' > $(OUT)/manifest-server
+	$(JAR) --create --file $(DIST)/connections-server.jar --manifest=$(OUT)/manifest-server -C $(OUT) .
+	printf 'Main-Class: client.ClientMain\nClass-Path: ../$(LIB)\n' > $(OUT)/manifest-client
+	$(JAR) --create --file $(DIST)/connections-client.jar --manifest=$(OUT)/manifest-client -C $(OUT) .
 
-# JAR client: per ora non implementato
-dist/connections-client.jar: all
-	@if [ ! -d $(SRC)/client ]; then \
-	    echo "❌ src/client non esiste ancora: client non implementato"; exit 1; \
-	fi
-	$(JAR) --create --file $@ --main-class $(CLIENT_MAIN) -C $(OUT) .
+run: compile
+	java -cp '$(CP)' server.core.ServerMain
 
-run: all
-	$(JAVA) -cp '$(CP)' $(MAIN)
-
-run-client: dist/connections-client.jar
-	$(JAVA) -cp 'dist/connections-client.jar:$(LIB)' $(CLIENT_MAIN)
+run-client: compile
+	java -cp '$(CP)' client.ClientMain
 
 clean:
 	rm -rf $(OUT) $(DIST)
 
-.PHONY: all run run-client clean
+.PHONY: compile run run-client clean
