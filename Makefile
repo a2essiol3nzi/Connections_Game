@@ -40,7 +40,13 @@ run: compile
 run-client: compile
 	java -cp '$(CP)' client.ClientMain
 
+# Compila ed esegue le suite di test
+test: compile
+	mkdir -p test/out
+	$(JAVAC) --release 8 -cp '$(CP)' -d test/out test/T.java test/TC.java test/TestFunc.java test/TestLoad.java test/TestStats.java test/RunAll.java
+	$(JAVA) -cp 'out:test/out:$(LIB)' test.RunAll
+
 clean:
-	rm -rf $(OUT) $(DIST)
+	rm -rf $(OUT) $(DIST) test/out
 
 .PHONY: compile run run-client clean

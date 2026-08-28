@@ -24,11 +24,11 @@
     "id": 2,
     "username": "ale",
     "password": "a",
-    "cumulativeScore": 6,
-    "puzzlesPlayed": 3,
+    "cumulativeScore": 18,
+    "puzzlesPlayed": 4,
     "puzzlesWon": 0,
     "puzzlesLost": 0,
-    "notFinished": 3,
+    "notFinished": 4,
     "currentStreak": 0,
     "maxStreak": 0,
     "perfectPuzzles": 0,
@@ -38,7 +38,7 @@
       0,
       0,
       0,
-      3
+      4
     ]
   },
   {

@@ -1,9 +1,10 @@
 # Test suite — Connections Game (Lab3)
 
-Suite di test in **Python stdlib** (nessuna dipendenza) che parla il
-**protocollo TCP grezzo** (`JSON` + `\n`) direttamente contro il server Java.
-Non usa il client CLI: così è facile automatizzare, parallelizzare e misurare
-il carico.
+Suite di test **Java** che parla il protocollo TCP **via `client.ClientConn`**
+(il client NIO già nel codebase: wire JSON-line + deserializzazione in
+`protocol.Response`). Nessuna dipendenza esterna oltre a `lib/gson-2.11.0.jar`
+(già usata dal progetto). I payload vengono riconvertiti in `protocol.payload.*`
+POJO con lo stesso pattern del client reale (`Gson.fromJson(toJson(payload),Cls)`).
 
 Il server viene avviato su una **config temporanea** (porte alte + file
 `persist`/`history` in `/tmp`): i test **non toccano** `data/users.json` di
@@ -12,10 +13,13 @@ produzione.
 ## Esecuzione
 
 ```bash
-make            # compila i sorgenti
-python3 test/run_all.py            # suite funzionale + carico
-python3 test/run_all.py --load     # solo carico/concorrenza
-python3 test/run_all.py --func     # solo funzionale
+make                            # compila i sorgenti
+javac -cp 'out:lib/gson-2.11.0.jar' -d test/out \
+    test/T.java test/TC.java test/TestFunc.java test/TestLoad.java test/RunAll.java
+
+java -cp 'out:test/out:lib/gson-2.11.0.jar' test.RunAll             # func + load
+java -cp 'out:test/out:lib/gson-2.11.0.jar' test.RunAll --load      # solo carico
+java -cp 'out:test/out:lib/gson-2.11.0.jar' test.RunAll --func      # solo funzionale
 ```
 
 Exit code: `0` = tutto verde, `1` = qualche FAIL riportato in fondo.
@@ -24,30 +28,26 @@ Exit code: `0` = tutto verde, `1` = qualche FAIL riportato in fondo.
 
 | File | Cosa fa |
 |------|---------|
-| `proto.py`        | Driver raw (TestClient) + `start_test_server()` (boot server su config temp) + micro-framework `VERIFY`/`SECTION`/`summary` |
-| `test_func.py`    | Suite **funzionale**: tutte le 9 operazioni, codici di errore, gate di auth, regola MALFORMATA-vs-ERRATA (§2.2), case-insensitivity, confini payload |
-| `test_load.py`    | Suite **carico/concorrenza**: throughput login, submit paralleli (lock granulare), doppio login, leaderboard sotto letture, disconnect bruschi |
-| `run_all.py`      | Orchestratore: compila, avvia server temp, esegue le suite, arresta server, riporta exit code |
+| `T.java`      | Micro-framework di assertion (`section`/`ok`/`err`/`cond`/`check`/`summary`), nessuna dipendenza |
+| `TC.java`     | `TC` = TestClient su `ClientConn` + wrapper tipizzati per le 9 operazioni + riconversione payload→POJO + `startServer()` (boot server su config temp) |
+| `TestFunc.java`| Suite **funzionale**: tutte le 9 operazioni, codici di errore, gate auth, regola MALFORMATA-vs-ERRATA (§2.2), case-insensitivity, confini payload |
+| `TestLoad.java`| Suite **carico/concorrenza**: throughput login (L1), submit paralleli / lock granulare (L2), doppio login + relogin dopo EOF (L3), leaderboard sotto letture (L4), disconnect bruschi (L5) |
+| `RunAll.java` | Orchestratore: build → avvio server temp → esegue le suite → arresta → exit code |
 
 ## Cosa cercare / colli di bottiglia
 
-- **Lock granulare** su `PlayerState.submit()`: il test L2 misura se le submit
-  parallele si serializzano o restano indipendenti (throughput submit/s).
-- **`synchronized(ctx.games)`** in `login`/`registerLogin`/`rotate`: un lock
-  globale su GameManager. Sotto carico di login concorrenti (L1) si vede se
-  resta un punto di serializzazione.
-- **`leaderboard()`** read-only senza lock globale (L4): deve restare fluido
+- **Lock granulare** su `PlayerState.submit()` (L2): le submit parallele non
+  devono serializzarsi su un lock globale.
+- **`synchronized(ctx.games)`** in login/rotate (L1): un lock globale su
+  GameManager sotto carico di login concorrenti è un punto di serializzazione.
+- **`leaderboard()` read-only** senza lock globale (L4): deve restare fluido
   sotto letture concorrenti senza crash.
-- **Pool limitato** (16 thread): con N connessioni bloccate in attesa, il pool
-  può esaurirsi (L5 con disconnect bruschi verifica che i worker vengano
-  liberati dal `finally` del `ClientHandler`).
-- **Disconnessione senza logout**: il `finally` deve fare logout implicito e
-  sbloccare l'utente (L3/L5).
+- **Pool limitato** (16 thread) + `finally` del `ClientHandler` (L5): i worker
+  devono tornare al pool e gli utenti sbloccarsi dopo disconnect brusco.
 
 ## Note
 
-- La prima partita caricata (source gameId `0`) è deterministica: le suite la
-  usano con le parole reali lette da `data/games.json` (registrazione + login
-  nel primo round della partita attiva).
-- Gli utenti di test vengono creati e lasciati nel `/tmp/.../users.json` della
-  sessione: non inquinano la produzione.
+- Le suite leggono `data/games.json` (prima partita, source gameId 0) per le
+  parole reali con cui forzare proposte corrette/errate deterministiche.
+- Gli utenti di test vivono nel `/tmp/conn_test_*` della sessione: non
+  inquinano la produzione.
