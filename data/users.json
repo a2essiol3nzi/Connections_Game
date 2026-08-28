@@ -1,1 +1,464 @@
-[]
+[
+  {
+    "id": 1,
+    "username": "axel",
+    "password": "b",
+    "cumulativeScore": 0,
+    "puzzlesPlayed": 3,
+    "puzzlesWon": 0,
+    "puzzlesLost": 0,
+    "notFinished": 3,
+    "currentStreak": 0,
+    "maxStreak": 0,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      3
+    ]
+  },
+  {
+    "id": 2,
+    "username": "ale",
+    "password": "a",
+    "cumulativeScore": 6,
+    "puzzlesPlayed": 3,
+    "puzzlesWon": 0,
+    "puzzlesLost": 0,
+    "notFinished": 3,
+    "currentStreak": 0,
+    "maxStreak": 0,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      3
+    ]
+  },
+  {
+    "id": 3,
+    "username": "user01",
+    "password": "passuser01",
+    "cumulativeScore": 0,
+    "puzzlesPlayed": 0,
+    "puzzlesWon": 0,
+    "puzzlesLost": 0,
+    "notFinished": 0,
+    "currentStreak": 0,
+    "maxStreak": 0,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 4,
+    "username": "user02",
+    "password": "passuser02",
+    "cumulativeScore": 0,
+    "puzzlesPlayed": 0,
+    "puzzlesWon": 0,
+    "puzzlesLost": 0,
+    "notFinished": 0,
+    "currentStreak": 0,
+    "maxStreak": 0,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 5,
+    "username": "user03",
+    "password": "passuser03",
+    "cumulativeScore": 0,
+    "puzzlesPlayed": 0,
+    "puzzlesWon": 0,
+    "puzzlesLost": 0,
+    "notFinished": 0,
+    "currentStreak": 0,
+    "maxStreak": 0,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 6,
+    "username": "user04",
+    "password": "passuser04",
+    "cumulativeScore": 0,
+    "puzzlesPlayed": 0,
+    "puzzlesWon": 0,
+    "puzzlesLost": 0,
+    "notFinished": 0,
+    "currentStreak": 0,
+    "maxStreak": 0,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 7,
+    "username": "user05",
+    "password": "passuser05",
+    "cumulativeScore": 0,
+    "puzzlesPlayed": 0,
+    "puzzlesWon": 0,
+    "puzzlesLost": 0,
+    "notFinished": 0,
+    "currentStreak": 0,
+    "maxStreak": 0,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 8,
+    "username": "user06",
+    "password": "passuser06",
+    "cumulativeScore": 0,
+    "puzzlesPlayed": 0,
+    "puzzlesWon": 0,
+    "puzzlesLost": 0,
+    "notFinished": 0,
+    "currentStreak": 0,
+    "maxStreak": 0,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 9,
+    "username": "user07",
+    "password": "passuser07",
+    "cumulativeScore": 0,
+    "puzzlesPlayed": 0,
+    "puzzlesWon": 0,
+    "puzzlesLost": 0,
+    "notFinished": 0,
+    "currentStreak": 0,
+    "maxStreak": 0,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 10,
+    "username": "user08",
+    "password": "passuser08",
+    "cumulativeScore": 0,
+    "puzzlesPlayed": 0,
+    "puzzlesWon": 0,
+    "puzzlesLost": 0,
+    "notFinished": 0,
+    "currentStreak": 0,
+    "maxStreak": 0,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 11,
+    "username": "user09",
+    "password": "passuser09",
+    "cumulativeScore": 0,
+    "puzzlesPlayed": 0,
+    "puzzlesWon": 0,
+    "puzzlesLost": 0,
+    "notFinished": 0,
+    "currentStreak": 0,
+    "maxStreak": 0,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 12,
+    "username": "user10",
+    "password": "passuser10",
+    "cumulativeScore": 0,
+    "puzzlesPlayed": 0,
+    "puzzlesWon": 0,
+    "puzzlesLost": 0,
+    "notFinished": 0,
+    "currentStreak": 0,
+    "maxStreak": 0,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 13,
+    "username": "user11",
+    "password": "passuser11",
+    "cumulativeScore": 36,
+    "puzzlesPlayed": 4,
+    "puzzlesWon": 2,
+    "puzzlesLost": 0,
+    "notFinished": 2,
+    "currentStreak": 0,
+    "maxStreak": 2,
+    "perfectPuzzles": 2,
+    "mistakeHist": [
+      2,
+      0,
+      0,
+      0,
+      0,
+      2
+    ]
+  },
+  {
+    "id": 14,
+    "username": "user12",
+    "password": "passuser12",
+    "cumulativeScore": 20,
+    "puzzlesPlayed": 9,
+    "puzzlesWon": 2,
+    "puzzlesLost": 4,
+    "notFinished": 3,
+    "currentStreak": 0,
+    "maxStreak": 2,
+    "perfectPuzzles": 2,
+    "mistakeHist": [
+      2,
+      0,
+      0,
+      0,
+      4,
+      3
+    ]
+  },
+  {
+    "id": 15,
+    "username": "user13",
+    "password": "passuser13",
+    "cumulativeScore": 2,
+    "puzzlesPlayed": 6,
+    "puzzlesWon": 1,
+    "puzzlesLost": 4,
+    "notFinished": 1,
+    "currentStreak": 1,
+    "maxStreak": 1,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      0,
+      1,
+      0,
+      4,
+      1
+    ]
+  },
+  {
+    "id": 16,
+    "username": "user14",
+    "password": "passuser14",
+    "cumulativeScore": 128,
+    "puzzlesPlayed": 14,
+    "puzzlesWon": 8,
+    "puzzlesLost": 4,
+    "notFinished": 2,
+    "currentStreak": 1,
+    "maxStreak": 6,
+    "perfectPuzzles": 4,
+    "mistakeHist": [
+      4,
+      1,
+      2,
+      1,
+      4,
+      2
+    ]
+  },
+  {
+    "id": 17,
+    "username": "user15",
+    "password": "passuser15",
+    "cumulativeScore": 28,
+    "puzzlesPlayed": 6,
+    "puzzlesWon": 2,
+    "puzzlesLost": 2,
+    "notFinished": 2,
+    "currentStreak": 2,
+    "maxStreak": 2,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      1,
+      1,
+      0,
+      2,
+      2
+    ]
+  },
+  {
+    "id": 18,
+    "username": "user16",
+    "password": "passuser16",
+    "cumulativeScore": 24,
+    "puzzlesPlayed": 5,
+    "puzzlesWon": 2,
+    "puzzlesLost": 3,
+    "notFinished": 0,
+    "currentStreak": 2,
+    "maxStreak": 2,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      1,
+      1,
+      0,
+      3,
+      0
+    ]
+  },
+  {
+    "id": 19,
+    "username": "user17",
+    "password": "passuser17",
+    "cumulativeScore": 72,
+    "puzzlesPlayed": 4,
+    "puzzlesWon": 4,
+    "puzzlesLost": 0,
+    "notFinished": 0,
+    "currentStreak": 0,
+    "maxStreak": 3,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      1,
+      2,
+      1,
+      0,
+      0
+    ]
+  },
+  {
+    "id": 20,
+    "username": "user18",
+    "password": "passuser18",
+    "cumulativeScore": 78,
+    "puzzlesPlayed": 10,
+    "puzzlesWon": 5,
+    "puzzlesLost": 3,
+    "notFinished": 2,
+    "currentStreak": 0,
+    "maxStreak": 4,
+    "perfectPuzzles": 2,
+    "mistakeHist": [
+      2,
+      2,
+      1,
+      0,
+      3,
+      2
+    ]
+  },
+  {
+    "id": 21,
+    "username": "user19",
+    "password": "passuser19",
+    "cumulativeScore": 38,
+    "puzzlesPlayed": 8,
+    "puzzlesWon": 3,
+    "puzzlesLost": 4,
+    "notFinished": 1,
+    "currentStreak": 1,
+    "maxStreak": 2,
+    "perfectPuzzles": 2,
+    "mistakeHist": [
+      2,
+      0,
+      0,
+      1,
+      4,
+      1
+    ]
+  },
+  {
+    "id": 22,
+    "username": "user20",
+    "password": "passuser20",
+    "cumulativeScore": 14,
+    "puzzlesPlayed": 2,
+    "puzzlesWon": 1,
+    "puzzlesLost": 1,
+    "notFinished": 0,
+    "currentStreak": 1,
+    "maxStreak": 1,
+    "perfectPuzzles": 0,
+    "mistakeHist": [
+      0,
+      0,
+      1,
+      0,
+      1,
+      0
+    ]
+  }
+]
