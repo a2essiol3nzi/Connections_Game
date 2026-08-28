@@ -31,8 +31,10 @@ Exit code: `0` = tutto verde, `1` = qualche FAIL riportato in fondo.
 | `T.java`      | Micro-framework di assertion (`section`/`ok`/`err`/`cond`/`check`/`summary`), nessuna dipendenza |
 | `TC.java`     | `TC` = TestClient su `ClientConn` + wrapper tipizzati per le 9 operazioni + riconversione payload→POJO + `startServer()` (boot server su config temp) |
 | `TestFunc.java`| Suite **funzionale**: tutte le 9 operazioni, codici di errore, gate auth, regola MALFORMATA-vs-ERRATA (§2.2), case-insensitivity, confini payload |
-| `TestLoad.java`| Suite **carico/concorrenza**: throughput login (L1), submit paralleli / lock granulare (L2), doppio login + relogin dopo EOF (L3), leaderboard sotto letture (L4), disconnect bruschi (L5) |
-| `RunAll.java` | Orchestratore: build → avvio server temp → esegue le suite → arresta → exit code |
+| `TestLoad.java` | Suite **carico/concorrenza**: throughput login (L1), submit paralleli / lock granulare (L2), doppio login + relogin dopo EOF (L3), leaderboard sotto letture (L4), disconnect bruschi (L5) |
+| `TestStats.java`| Suite **stats** su game reali (win/loss/not-finish): streak, winRate/lossRate, perfectPuzzles, mistakeHistogram |
+| `TestLoader.java`| Suite **robustezza GameLoader** (unit): `total()`, ordine ciclico, wrap, e skip di voci con data-binding rotto senza crash |
+| `RunAll.java` | Orchestratore: build → avvio dei server temp → esegue le suite → arresta → exit code |
 
 ## Cosa cercare / colli di bottiglia
 

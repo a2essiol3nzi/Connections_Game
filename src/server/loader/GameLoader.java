@@ -100,6 +100,10 @@ public class GameLoader {
                         index = 0; 
                     } // wrap ciclico a EOF
                     GameData g = GSON.fromJson(reader, GameData.class);
+                    if (!isWellFormed(g)) {
+                        // JSON valido ma partita non giocabile -> scarta come malformata.
+                        throw new JsonSyntaxException("partita non giocabile (servono 4 gruppi x 4 parole, tema e parole non nulli)");
+                    }
                     index++;
                     return g;
                 } catch (IOException e) {
@@ -119,6 +123,19 @@ public class GameLoader {
 
     public CyclicGameIterator cyclicIterator() {
         return new CyclicGameIterator();
+    }
+
+    // Una partita è giocabile solo se ha ESATTAMENTE 4 gruppi, ciascuno con
+    // tema non-null e 4 parole non null.
+    // Nota: GSON compila campi come null se non presenti ("errore" silenzioso).
+    private static boolean isWellFormed(GameData g) {
+        if (g == null || g.groups == null || g.groups.size() != 4) return false;
+        for (GameData.Group gr : g.groups) {
+            if (gr == null || gr.theme == null) return false;
+            if (gr.words == null || gr.words.size() != 4) return false;
+            for (String w : gr.words) if (w == null) return false;
+        }
+        return true;
     }
 
     // Apre il file come JsonReader UTF-8 (streaming, non bufferizzato in RAM).

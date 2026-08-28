@@ -34,8 +34,8 @@ public class RunAll {
         // TestStats usa un server dedicato con durata di partita BREVE (rotazione rapida)
         System.out.println("\n[stats] TestStats: server dedicato (durata breve)");
         code += TestStats.run(proj);
-        System.out.println("\n[streak] TestStreak: accumulo current/maxStreak");
-        code += TestStreak.run(proj);
+        System.out.println("\n[loader] TestLoader: robustezza GameLoader unit");
+        code += TestLoader.run(proj);
         System.exit(code == 0 ? 0 : 1);
     }
 
