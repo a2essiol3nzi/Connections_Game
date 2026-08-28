@@ -148,7 +148,11 @@ public class Cli {
     }
 
     private static Integer parseId(String[] t, int i) {
-        if (t.length > i) { try { return Integer.parseInt(t[i]); } catch (NumberFormatException e) { } }
+        if (t.length > i) { 
+            try { 
+                return Integer.parseInt(t[i]); 
+            } catch (NumberFormatException e) { } 
+        }
         return -1;
     }
 

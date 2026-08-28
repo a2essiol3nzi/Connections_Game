@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * Connessione TCP persistente lato client in NIO (SocketChannel + Selector).
  *
- * Il server usa una riga JSON per ogni risposta (\n). Le chiamate sono
+ * Il server usa una riga JSON per ogni risposta (`\n`). Le chiamate sono
  * serializzate (synchronized): un unico lock copre scrivi+leggi, così il thread
  * CLI principale e l'eventuale fetch dall'UdpClient non intrecciano le righe.
  */

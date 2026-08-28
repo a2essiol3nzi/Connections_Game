@@ -53,7 +53,6 @@ public class GameScheduler implements Runnable {
                 System.err.println("[Scheduler] persist failed: " + e.getMessage());
             }
             Set<Integer> parts = g.participants();
-            // Notifica UDP: POJO condiviso (protocol.GameEnded) invece di JsonObject a mano.
             notifier.notifyEnd(parts, new GameEnded("GAME_ENDED", g.gameId, g.roundId));
             System.out.println("[Scheduler] game " + g.gameId + " (round " + g.roundId + ") ended, " + parts.size() + " players");
             gameMan.rotate(System.currentTimeMillis());
