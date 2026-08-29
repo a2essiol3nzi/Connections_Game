@@ -1,5 +1,3 @@
-package test;
-
 import protocol.Response;
 import protocol.payload.PlayerStatsPayload;
 
@@ -66,13 +64,7 @@ public class TestStats {
                 // finalizeGame avanza puzzlesCompleted PRIMA di rotate -> senza questo sync
                 // i submit cadrebbero sul round 1 gia' finalizzato (ERR_GAME_OVER_FOR_YOU).
                 awaitRoundAdvance(c, r1);
-                System.out.println("  [dbg] round avanzato: currentRound=" + c.asGameInfo(c.gameInfo(-1)).gameId);
-                for (int i = 0; i < 4; i++) {
-                    Response sr = c.submit(wrong); // -> 4 errori -> loss
-                    if (!"OK".equals(sr.status)) {
-                        System.out.println("  [dbg] submit#" + i + " -> " + sr.status + " " + sr.errorCode);
-                    }
-                }
+                for (int i = 0; i < 4; i++) c.submit(wrong); // 4 errori -> loss
                 PlayerStatsPayload p2 = awaitPuzzleCount(c, 2);
                 T.cond("dopo LOSS: puzzlesCompleted=2", p2.puzzlesCompleted == 2);
                 T.cond("dopo LOSS: currentStreak reset a 0", p2.currentStreak == 0);

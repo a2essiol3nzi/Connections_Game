@@ -1,24 +1,19 @@
-package test;
-
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import protocol.Response;
-import protocol.payload.GameStatsPayload;
 import protocol.payload.GameInfoPayload;
 import protocol.payload.LeaderboardPayload;
 import protocol.payload.PlayerStatsPayload;
-import protocol.payload.SubmitPayload;
 
 import java.io.FileReader;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Suit FUNZIONALE: tutte le 9 operazioni, codici di errore, gate di auth,
- * regola MALFORMATA-vs-ERRATA (§2.2), case-insensitivity, confini payload.
+ * regola MALFORMATA-vs-ERRATA, case-insensitivity, confini payload.
  * Usa la prima partita caricata (source gameId 0) con le parole reali da games.json.
  */
 public class TestFunc {
@@ -81,7 +76,6 @@ public class TestFunc {
         WRONG.add(WORDS_GROUPS.get(3).get(0));
         List<String> BAD_WORD = new ArrayList<>(Arrays.asList("###NOT-A-WORD###", G0.get(0), G0.get(1), G0.get(2)));
         List<String> DUP = Arrays.asList(G0.get(0), G0.get(0), G0.get(1), G0.get(2));
-        List<String> MIXED = Arrays.asList(G1.get(0), G1.get(1), G1.get(2), "###NEW###");
 
         try (TC c = new TC(port, 40000)) {
             T.ok("login", c.login("t_user", "pw", 40000));
@@ -191,7 +185,8 @@ public class TestFunc {
     }
 
     private static protocol.Request noPswReq(String u) {
-        protocol.Request r = new protocol.Request(); r.operation = "register"; r.username = u; return r;
+        protocol.Request r = new protocol.Request(); r.operation = "register"; r.username = u; 
+        return r;
     }
     private static protocol.Request noUdpLoginReq(String u, String p) {
         protocol.Request r = new protocol.Request(); r.operation = "login"; r.username = u; r.psw = p; return r;

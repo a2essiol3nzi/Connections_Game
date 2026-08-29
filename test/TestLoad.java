@@ -1,5 +1,3 @@
-package test;
-
 import protocol.Response;
 import protocol.payload.GameInfoPayload;
 
@@ -14,12 +12,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  *  L1 login concorrenti (throughput)
  *  L2 submit paralleli (lock granulare su PlayerState -> no serializzazione globale)
  *  L3 doppio login -> ERR_ALREADY_LOGGED_IN + relogin dopo EOF
- *  L4 leaderboard sotto letture concorrenti (read-heavy, nessun crash)
+ *  L4 leaderboard sotto letture concorrenti
  *  L5 disconnect brusco (EOF) senza crash
  */
 public class TestLoad {
-
-    private static final int PORT = 0; // sostituita dal runner
 
     public static int run(int port) throws Exception {
         int fails = 0;
@@ -36,16 +32,16 @@ public class TestLoad {
             final String uname = "u" + TS + "_" + fi;
             Thread th = new Thread(() -> {
                 try (TC c = new TC(port, 40000 + (fi%100))) {
-                    if (c.register(uname, "pw").status != null
-                            && !"OK".equals(c.register(uname, "pw").status)) { /* tocca registrare una volta */ }
                     c.register(uname + "x", "pw");
                     Response r = c.login(uname + "x", "pw", 40000);
-                    if (!"OK".equals(r.status)) l1fail.incrementAndGet();
+                    if (!"OK".equals(r.status)) 
+                        l1fail.incrementAndGet();
                 } catch (Exception e) { l1fail.incrementAndGet(); }
             });
             th.start(); threads.add(th);
         }
-        for (Thread th : threads) th.join();
+        for (Thread th : threads) 
+            th.join();
         long total = System.nanoTime() - t0;
         T.cond("L1: 0 login falliti", l1fail.get() == 0);
         System.out.printf("  %d login concorrenti in %.0f ms (~%.0f login/s)%n",

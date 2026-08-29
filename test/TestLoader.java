@@ -1,8 +1,7 @@
-package test;
-
 import server.loader.GameLoader;
 import server.model.GameData;
 
+import com.google.gson.Gson;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -24,6 +23,8 @@ import java.util.List;
  * I file corrotti vengono generati in /tmp: sub-game.json resta pulito.
  */
 public class TestLoader {
+
+    private static final Gson GSON = new Gson();
 
     public static int run(String projectDir) throws Exception {
         int base = T.FAILURES.size();
@@ -122,84 +123,57 @@ public class TestLoader {
         return (T.FAILURES.size() - base) == 0 ? 0 : 1;
     }
 
-    /** Legge dalla testa dell'iteratore finche' non incontra gameId target (wrap: attraversa tutto). */
-    private static GameData consumeThroughId(GameLoader.CyclicGameIterator it, int target) throws Exception {
-        for (int i = 0; i < 100; i++) {
-            GameData d = it.next();
-            if (d.gameId == target) return d;
-        }
-        return null;
-    }
-
-    /** Imposta a null una parola del PRIMO gruppo della voce con gameId==target. */
+    // Imposta a null una parola del PRIMO gruppo (gameId==target).
     private static void writeNullWord(String src, String dst, int targetId) throws IOException {
-        String text = new String(Files.readAllBytes(Paths.get(src)), StandardCharsets.UTF_8);
-        int start = indexOfGame(text, targetId);
-        // trova la prima "words" dopo la voce
-        int wordsIdx = text.indexOf("\"words\": [", start);
-        if (wordsIdx < 0) throw new IllegalStateException("words non trovato per gameId " + targetId);
-        int valStart = text.indexOf('"', wordsIdx + "\"words\": [".length());
-        int valEnd = text.indexOf('"', valStart + 1) + 1;
-        String out = text.substring(0, valStart) + "null" + text.substring(valEnd);
-        Files.write(Paths.get(dst), out.getBytes(StandardCharsets.UTF_8));
+        List<GameData> games = readGames(src);
+        for (GameData g : games) if (g.gameId == targetId) g.groups.get(0).words.set(0, null);
+        writeGames(dst, games);
     }
 
-    /** Rimuove l'ULTIMO gruppo della voce con gameId==target (4 -> 3). */
+    // Rimuove l'ULTIMO gruppo della voce (4 -> 3) con gameId==target.
     private static void writeMissingGroup(String src, String dst, int targetId) throws IOException {
-        String text = new String(Files.readAllBytes(Paths.get(src)), StandardCharsets.UTF_8);
-        int start = indexOfGame(text, targetId);
-        int endIdx = text.indexOf("\n  ]}", start); // chiusura della voce (indentata in sub-game.json)
-        if (endIdx < 0) throw new IllegalStateException("chiusura voce non trovata per gameId " + targetId);
-        int objStart = text.lastIndexOf('{', start); // inizio della voce (il '{' prima del gameId)
-        if (objStart < 0) throw new IllegalStateException("inizio voce non trovato per " + targetId);
-        // taglia all'interno della voce: rimuove l'ultimo gruppo {...} (quello prima della chiusura "  ]}")
-        int grpStart = text.lastIndexOf("\"theme\"", endIdx);
-        int grpBracesBefore = text.lastIndexOf('{', grpStart);
-        // la voce ha 4 gruppi ciascuno "{...},"; rimuovi l'ultimo blocco {...} (incl. virgola precedente)
-        int lastComma = text.lastIndexOf(',', grpBracesBefore);
-        String out = text.substring(0, lastComma) + text.substring(endIdx);
-        Files.write(Paths.get(dst), out.getBytes(StandardCharsets.UTF_8));
+        List<GameData> games = readGames(src);
+        for (GameData g : games) if (g.gameId == targetId) g.groups.remove(g.groups.size() - 1);
+        writeGames(dst, games);
     }
 
-    /** Imposta a null il "theme" del PRIMO gruppo della voce con gameId==target. */
+    // Imposta a null il "theme" del PRIMO gruppo della voce con gameId==target.
     private static void writeMissingTheme(String src, String dst, int targetId) throws IOException {
-        String text = new String(Files.readAllBytes(Paths.get(src)), StandardCharsets.UTF_8);
-        int start = indexOfGame(text, targetId);
-        // il primo "theme" dopo la voce (primo gruppo di quella partita)
-        int themeIdx = text.indexOf("\"theme\": ", start);
-        if (themeIdx < 0) throw new IllegalStateException("theme non trovato per gameId " + targetId);
-        int valStart = themeIdx + "\"theme\": ".length();
-        int valEnd = text.indexOf(',', valStart);
-        String out = text.substring(0, valStart) + "null" + text.substring(valEnd);
-        Files.write(Paths.get(dst), out.getBytes(StandardCharsets.UTF_8));
+        List<GameData> games = readGames(src);
+        for (GameData g : games) if (g.gameId == targetId) g.groups.get(0).theme = null;
+        writeGames(dst, games);
     }
 
-    private static int indexOfGame(String text, int targetId) {
-        int i = text.indexOf("\"gameId\": " + targetId);
-        if (i < 0) throw new IllegalStateException("gameId " + targetId + " non trovato");
-        return i;
-    }
-
-    // Corrompe la voce con gameId == target: gameId diventa stringa -> NumberFormatException in GameData.
-    private static void writeCorrupted(String src, String dst) throws IOException {
-        writeCorruptedIdx(src, dst, 2);
-    }
-    private static void writeCorruptedFirst(String src, String dst) throws IOException {
-        writeCorruptedIdx(src, dst, 0);
-    }
-    private static void writeCorruptedLast(String src, String dst) throws IOException {
-        writeCorruptedIdx(src, dst, 5);
-    }
-
+    /** Corrompe il data-binding della voce con gameId==target: "gameId": N -> "gameId": "NOTANUMBER".
+     *  Puro testuale sul file già riscritto da writeGames (formato Gson pretty stabile). */
     private static void writeCorruptedIdx(String src, String dst, int targetId) throws IOException {
         String text = new String(Files.readAllBytes(Paths.get(src)), StandardCharsets.UTF_8);
-        String marker = "\"gameId\": " + targetId;
-        int i = text.indexOf(marker);
-        if (i < 0) throw new IllegalStateException("marker non trovato: " + marker);
+        String target = "\"gameId\": " + targetId;
+        int i = text.indexOf(target);
+        if (i < 0) throw new IllegalStateException("gameId " + targetId + " non trovato");
+        // sostituisce il valore numerico con una stringa -> Gson su int fallisce (data-binding rotto)
         int colon = text.indexOf(':', i) + 1;
-        String after = text.substring(colon);
-        int comma = after.indexOf(',');
-        String out = text.substring(0, colon) + " \"NOTANUMBER\"" + after.substring(comma);
+        int comma = text.indexOf(',', colon);
+        String out = text.substring(0, colon) + " \"NOTANUMBER\"" + text.substring(comma);
         Files.write(Paths.get(dst), out.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static void writeCorrupted(String src, String dst) throws IOException { writeCorruptedIdx(src, dst, 2); }
+    private static void writeCorruptedFirst(String src, String dst) throws IOException { writeCorruptedIdx(src, dst, 0); }
+    private static void writeCorruptedLast(String src, String dst) throws IOException { writeCorruptedIdx(src, dst, 5); }
+
+    // Legge il file JSON in List<GameData> tramite Gson.
+    private static List<GameData> readGames(String path) throws IOException {
+        java.lang.reflect.Type t = new com.google.gson.reflect.TypeToken<List<GameData>>() {}.getType();
+        java.io.Reader r = new java.io.InputStreamReader(new java.io.FileInputStream(path), StandardCharsets.UTF_8);
+        List<GameData> out = GSON.fromJson(r, t);
+        r.close();
+        return out;
+    }
+
+    // Riscrive la lista con Gson (pretty).
+    private static void writeGames(String dst, List<GameData> games) throws IOException {
+        String json = new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(games);
+        Files.write(Paths.get(dst), json.getBytes(StandardCharsets.UTF_8));
     }
 }

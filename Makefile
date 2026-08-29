@@ -44,7 +44,7 @@ run-client: compile
 test: compile
 	mkdir -p test/out
 	$(JAVAC) --release 8 -cp '$(CP)' -d test/out test/T.java test/TC.java test/TestFunc.java test/TestLoad.java test/TestStats.java test/TestLoader.java test/RunAll.java
-	$(JAVA) -cp 'out:test/out:$(LIB)' test.RunAll
+	$(JAVA) -cp 'out:test/out:$(LIB)' RunAll
 
 clean:
 	rm -rf $(OUT) $(DIST) test/out

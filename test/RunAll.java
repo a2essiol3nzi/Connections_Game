@@ -1,5 +1,3 @@
-package test;
-
 /**
  * Runner: compila (make), avvia il server su config temporanea, esegue le suite
  * funzionale e di carico, arresta il server. Exit 0 se tutto verde.
