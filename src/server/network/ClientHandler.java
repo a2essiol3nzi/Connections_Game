@@ -198,16 +198,14 @@ public class ClientHandler implements Runnable {
     }
 
     private Response handleProposal(List<String> words) {
-        synchronized (ctx.games) {
-            ActiveGame.SubmitResult r = ctx.games.submitProposal(loggedInUserId, words);
-            if (r.isOk()) {
-                SubmitPayload p = new SubmitPayload();
-                p.result = r.resultLabel();
-                p.game = ctx.games.gameInfo(loggedInUserId, -1, ctx.users);
-                return Response.ok(p);
-            }
-            return Response.err(r.error()); // mappato 1:1 sull'enum Errors
+        ActiveGame.SubmitResult r = ctx.games.submitProposal(loggedInUserId, words);
+        if (r.isOk()) {
+            SubmitPayload p = new SubmitPayload();
+            p.result = r.resultLabel();
+            p.game = ctx.games.gameInfo(loggedInUserId, -1, ctx.users);
+            return Response.ok(p);
         }
+        return Response.err(r.error());
     }
 
     private static int roundIdOr(Integer v, int def) { return v == null ? def : v; }

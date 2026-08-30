@@ -1,18 +1,15 @@
 package server.persistence;
 
-import server.core.GameManager;
 import server.core.UserStore;
 
-// Thread di persistenza periodica: salva dati importanti su JSON a intervalli.
+// Thread di persistenza periodica: salva gli utenti su JSON a intervalli.
 public class PersistenceThread implements Runnable {
 
     private final UserStore users;
-    private final GameManager games;
     private final int intervalSec;
 
-    public PersistenceThread(UserStore users, GameManager games, int intervalSec) {
+    public PersistenceThread(UserStore users, int intervalSec) {
         this.users = users;
-        this.games = games;
         this.intervalSec = intervalSec;
     }
 
@@ -22,8 +19,10 @@ public class PersistenceThread implements Runnable {
             try {
                 Thread.sleep(intervalSec * 1000L);
                 users.persist();
-                games.persistHistory();
-                System.out.println("[Persist] users + history saved");
+                // Storico partite cambia solo a fine partita: lo salva già il
+                // scheduler (post-finalize) + lo shutdown hook; qui non serve il
+                // persist periodico.
+                System.out.println("[Persist] users saved");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;

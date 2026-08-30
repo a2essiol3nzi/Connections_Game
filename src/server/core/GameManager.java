@@ -2,7 +2,6 @@ package server.core;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.JsonIOException;
 
@@ -59,13 +58,14 @@ public class GameManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final int HISTORY_CAP = 10_000;
 
-    private final GameLoader loader;          // sorgente partite PIGRO
-    private final int durationSec;           // durata partita (da config)
+    private final GameLoader loader; // sorgente partite PIGRO
+    private final int durationSec; // durata partita (da config)
     private final Random rnd = new Random();
-    private final CyclicGameIterator games;  // iteratore ciclico sul loader pigro
+    private final CyclicGameIterator games; // iteratore ciclico sul loader pigro
 
     // Partita globale attiva (null solo se il loader è vuoto).
-    private ActiveGame current;
+    // volatile + costruita PRIMA dell'assegnazione -> visibilità corretta senza lock in lettura.
+    private volatile ActiveGame current;
     // Storico partite CONCLUSE: roundId -> (groups con tema + userId -> esito/score).
     private final Map<Integer, GameHistory> history = new ConcurrentHashMap<>();
     // Utenti attualmente loggati (per auto-join).
@@ -115,7 +115,7 @@ public class GameManager {
         }
     }
 
-    public synchronized ActiveGame current() { return current; }
+    public ActiveGame current() { return current; }
 
     // Lo scheduler chiama questo allo scadere della partita corrente.
     public synchronized void rotate(long nowMs) {
@@ -123,6 +123,7 @@ public class GameManager {
         if (current == null) 
             return;
         // Auto-join di tutti gli utenti online.
+        // snapshot per iter stabile (attualmente non necessaria).
         for (int u : new ArrayList<>(onlineUsers))
             current.join(u);
     }
@@ -178,11 +179,12 @@ public class GameManager {
 
     /**
      * Valuta una proposta. Ritorna un ActiveGame.SubmitResult (enum).
-     * SINCRONIZZATO: serializza con rotate() per evitare TOCTOU tra current() e submit().
-     * Senza lock, Alice potrebbe leggere ROSSO, rotate() cambia current a BLU,
-     * poi Alice chiama submit() su ROSSO (vecchia partita) anziché BLU (nuova).
+     * NON synchronized: la TOCTOU tra current() e submit() è gestita a valle da
+     * ActiveGame.finalized (AtomicBoolean) + finalizeGame idempotente: un submit
+     * sull'ex-partita al rotate torna ERR_FINISHED (semantica sana). Il vero
+     * parallelismo è garantito dal lock granulare su PlayerState in ActiveGame.submit.
      */
-    public synchronized ActiveGame.SubmitResult submitProposal(int userId, List<String> words) {
+    public ActiveGame.SubmitResult submitProposal(int userId, List<String> words) {
         ActiveGame g = current();
         if (g == null)
             return ActiveGame.SubmitResult.ERR_NO_ACTIVE_GAME;
@@ -403,17 +405,21 @@ public class GameManager {
             // Nessun lock aggiuntivo, finalized=true previene concurrent modification
             PlayerState ps = g.getState(u);
             if (ps == null) continue;
-            oc = g.outcomeOf(ps);
+            oc = g.outcomeOf(ps); // già synchronized(ps)
             he = new HistoryEntry();
-            he.correct = ps.correctCount; he.errors = ps.errorCount;
-            he.score = ps.score(); he.outcome = oc.name();
+            // Lock esplicito su ps, protegge da submit concorrenti.
+            synchronized (ps) {
+                he.correct = ps.correctCount; 
+                he.errors = ps.errorCount;
+                he.score = ps.score();
+            }
+            he.outcome = oc.name();
             // Risoluzione per id IMMUTABILE: sopravvive alla rinomina delle credenziali
             // avvenuta durante la partita (fix: lo stato di gioco è chiave per userId).
             UserStore.User user = store.getById(u);
-            if (user == null)
-                continue;          // utente non persistito: niente storico, niente stat
-            h.entries.put(user.id, he);          // chiave = id immutabile (B), non username
-
+            if (user == null) // utente non persistito: niente storico, niente stat
+                continue;
+            h.entries.put(user.id, he); // chiave = id immutabile, non username
             synchronized (user) {
                 user.puzzlesPlayed++;
                 user.cumulativeScore += he.score;
@@ -435,13 +441,13 @@ public class GameManager {
             }
         }
         history.put(h.roundId, h);
-        if (history.size() > HISTORY_CAP) 
+        if (history.size() > HISTORY_CAP) {
             trimHistory();
+        }
     }
 
     // Tiene lo storico bounded rimuovendo il roundId più basso.
-    // Per implementazioni reali avremmo usato un DB, e questa misura
-    // non sarebbe servita (ora solo per scopi didattici).
+    // Per implementazioni reali avremmo usato un DB (ora solo per scopi didattici).
     private void trimHistory() {
         int min = Integer.MAX_VALUE;
         for (int k : history.keySet()) 
@@ -449,17 +455,31 @@ public class GameManager {
         history.remove(min);
     }
 
-    // PERSISTENZA STORICO
-    public synchronized void persistHistory() throws IOException {
-        JsonElement je = GSON.toJsonTree(history);
-        Path p = Paths.get(historyFile);
-        if (p.getParent() != null) 
-            Files.createDirectories(p.getParent());
-        Path tmp = Paths.get(historyFile + ".tmp");
-        try (BufferedWriter w = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
-            GSON.toJson(je, w);
+    /**
+     * PERSISTENZA STORICO
+     * Scelta consapevole per questo progetto didattico: storico intero riscritto su file
+     * JSON atomico. In produzione aziendale si userebbe un DB (append-only/WAL) che evita
+     * di riscrivere tutto a ogni salvataggio; QUI il vincolo del progetto è "persistenza su
+     * file JSON" e lo storico è bounded (HISTORY_CAP=10k, ~MB) e cambia una volta per partita,
+     * quindi la riscrittura integrale è adeguata e accettabile (niente early-optimization).
+     * Gson serializza STREAMED verso il writer (toJson(map, w)): niente String/JsonElement
+     * intermedia dell'intero storico in RAM = memoria extra O(1). history.put avviene SOLO in
+     * finalizeGame (synchronized), chiamato dal solo scheduler => unico scrittore, nessun lock
+     * aggiuntivo necessario per lo snapshot. I/O su ioLock dedicato -> non blocca il gameplay. 
+     */ 
+    private final Object ioLock = new Object();
+
+    public void persistHistory() throws IOException {
+        synchronized (ioLock) {
+            Path p = Paths.get(historyFile);
+            if (p.getParent() != null) 
+                Files.createDirectories(p.getParent());
+            Path tmp = Paths.get(historyFile + ".tmp");
+            try (BufferedWriter w = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
+                GSON.toJson(history, w);
+            }
+            Files.move(tmp, p, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         }
-        Files.move(tmp, p, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }
 
     private void loadHistory() {

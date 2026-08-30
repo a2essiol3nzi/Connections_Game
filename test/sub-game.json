@@ -1,0 +1,248 @@
+[
+  {
+    "gameId": 0,
+    "groups": [
+      {
+        "theme": "tema00",
+        "words": [
+          "alfa",
+          "beta",
+          "gamma",
+          "delta"
+        ]
+      },
+      {
+        "theme": "tema01",
+        "words": [
+          "zeta",
+          "eta",
+          "iota",
+          "kappa"
+        ]
+      },
+      {
+        "theme": "tema02",
+        "words": [
+          "lambda",
+          "mu",
+          "nu",
+          "xi"
+        ]
+      },
+      {
+        "theme": "tema03",
+        "words": [
+          "omicron",
+          "pi",
+          "rho",
+          "sigma"
+        ]
+      }
+    ]
+  },
+  {
+    "gameId": 1,
+    "groups": [
+      {
+        "theme": "tema10",
+        "words": [
+          "alfa",
+          "beta",
+          "gamma",
+          "delta"
+        ]
+      },
+      {
+        "theme": "tema11",
+        "words": [
+          "zeta",
+          "eta",
+          "iota",
+          "kappa"
+        ]
+      },
+      {
+        "theme": "tema12",
+        "words": [
+          "lambda",
+          "mu",
+          "nu",
+          "xi"
+        ]
+      },
+      {
+        "theme": "tema13",
+        "words": [
+          "omicron",
+          "pi",
+          "rho",
+          "sigma"
+        ]
+      }
+    ]
+  },
+  {
+    "gameId": 2,
+    "groups": [
+      {
+        "theme": "tema20",
+        "words": [
+          "alfa",
+          "beta",
+          "gamma",
+          "delta"
+        ]
+      },
+      {
+        "theme": "tema21",
+        "words": [
+          "zeta",
+          "eta",
+          "iota",
+          "kappa"
+        ]
+      },
+      {
+        "theme": "tema22",
+        "words": [
+          "lambda",
+          "mu",
+          "nu",
+          "xi"
+        ]
+      },
+      {
+        "theme": "tema23",
+        "words": [
+          "omicron",
+          "pi",
+          "rho",
+          "sigma"
+        ]
+      }
+    ]
+  },
+  {
+    "gameId": 3,
+    "groups": [
+      {
+        "theme": "tema30",
+        "words": [
+          "alfa",
+          "beta",
+          "gamma",
+          "delta"
+        ]
+      },
+      {
+        "theme": "tema31",
+        "words": [
+          "zeta",
+          "eta",
+          "iota",
+          "kappa"
+        ]
+      },
+      {
+        "theme": "tema32",
+        "words": [
+          "lambda",
+          "mu",
+          "nu",
+          "xi"
+        ]
+      },
+      {
+        "theme": "tema33",
+        "words": [
+          "omicron",
+          "pi",
+          "rho",
+          "sigma"
+        ]
+      }
+    ]
+  },
+  {
+    "gameId": 4,
+    "groups": [
+      {
+        "theme": "tema40",
+        "words": [
+          "alfa",
+          "beta",
+          "gamma",
+          "delta"
+        ]
+      },
+      {
+        "theme": "tema41",
+        "words": [
+          "zeta",
+          "eta",
+          "iota",
+          "kappa"
+        ]
+      },
+      {
+        "theme": "tema42",
+        "words": [
+          "lambda",
+          "mu",
+          "nu",
+          "xi"
+        ]
+      },
+      {
+        "theme": "tema43",
+        "words": [
+          "omicron",
+          "pi",
+          "rho",
+          "sigma"
+        ]
+      }
+    ]
+  },
+  {
+    "gameId": 5,
+    "groups": [
+      {
+        "theme": "tema50",
+        "words": [
+          "alfa",
+          "beta",
+          "gamma",
+          "delta"
+        ]
+      },
+      {
+        "theme": "tema51",
+        "words": [
+          "zeta",
+          "eta",
+          "iota",
+          "kappa"
+        ]
+      },
+      {
+        "theme": "tema52",
+        "words": [
+          "lambda",
+          "mu",
+          "nu",
+          "xi"
+        ]
+      },
+      {
+        "theme": "tema53",
+        "words": [
+          "omicron",
+          "pi",
+          "rho",
+          "sigma"
+        ]
+      }
+    ]
+  }
+]

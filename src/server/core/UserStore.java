@@ -178,42 +178,53 @@ public class UserStore {
         return byId.get(id);
     }
 
+    // I/O su disco (il lento) su monitor dedicato -> non blocca register/login.
+    // (usano `synchronized(this)`).
+    private final Object ioLock = new Object();
 
-    // PERSISTENZA (snapshot JSON atomico)
-    // synchronized: timer (PersistenceThread), scheduler (post-finalize) e
-    // shutdown hook chiamano tutti questo metodo -> serializza la scrittura
-    // su file.tmp + ATOMIC_MOVE.
-    public synchronized void persist() throws IOException {
-        JsonArray arr = new JsonArray();
-        for (User u : byId.values()) {
-            synchronized (u) {
-                JsonObject o = new JsonObject();
-                o.addProperty("id", u.id);
-                o.addProperty("username", u.username);
-                o.addProperty("password", u.password);
-                o.addProperty("cumulativeScore", u.cumulativeScore);
-                o.addProperty("puzzlesPlayed", u.puzzlesPlayed);
-                o.addProperty("puzzlesWon", u.puzzlesWon);
-                o.addProperty("puzzlesLost", u.puzzlesLost);
-                o.addProperty("notFinished", u.notFinished);
-                o.addProperty("currentStreak", u.currentStreak);
-                o.addProperty("maxStreak", u.maxStreak);
-                o.addProperty("perfectPuzzles", u.perfectPuzzles);
-                JsonArray m = new JsonArray();
-                for (int x : u.mistakeHist) 
-                    m.add(x);
-                o.add("mistakeHist", m);
-                arr.add(o);
+    /**
+     * PERSISTENZA (snapshot JSON atomico)
+     * Disk I/O esce sul monitor `ioLock`, così register/login (che usano 
+     * `synchronized(this)`) non si bloccano sulla scrittura, ma le 3 fonti 
+     * concorrenti (timer/scheduler/shutdown) si serializzano ancora tra 
+     * loro tramite `ioLock`.
+     */
+    public void persist() throws IOException {
+        JsonArray arr;
+        synchronized (this) {
+            arr = new JsonArray();
+            for (User u : byId.values()) {
+                synchronized (u) {
+                    JsonObject o = new JsonObject();
+                    o.addProperty("id", u.id);
+                    o.addProperty("username", u.username);
+                    o.addProperty("password", u.password);
+                    o.addProperty("cumulativeScore", u.cumulativeScore);
+                    o.addProperty("puzzlesPlayed", u.puzzlesPlayed);
+                    o.addProperty("puzzlesWon", u.puzzlesWon);
+                    o.addProperty("puzzlesLost", u.puzzlesLost);
+                    o.addProperty("notFinished", u.notFinished);
+                    o.addProperty("currentStreak", u.currentStreak);
+                    o.addProperty("maxStreak", u.maxStreak);
+                    o.addProperty("perfectPuzzles", u.perfectPuzzles);
+                    JsonArray m = new JsonArray();
+                    for (int x : u.mistakeHist) 
+                        m.add(x);
+                    o.add("mistakeHist", m);
+                    arr.add(o);
+                }
             }
         }
-        Path p = Paths.get(persistFile);
-        if (p.getParent() != null)
-            Files.createDirectories(p.getParent());
-        Path tmp = Paths.get(persistFile + ".tmp");
-        try (BufferedWriter w = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
-            GSON.toJson(arr, w);
+        synchronized (ioLock) {
+            Path p = Paths.get(persistFile);
+            if (p.getParent() != null)
+                Files.createDirectories(p.getParent());
+            Path tmp = Paths.get(persistFile + ".tmp");
+            try (BufferedWriter w = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
+                GSON.toJson(arr, w);
+            }
+            Files.move(tmp, p, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         }
-        Files.move(tmp, p, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }
 
     // CARICAMENTO (all'avvio), esecuzione single threaded.

@@ -51,7 +51,7 @@ public class ServerMain {
 
         // 4) thread di supporto
         new Thread(new GameScheduler(ctx.games, ctx.users, ctx.notifier), "scheduler").start();
-        new Thread(new PersistenceThread(ctx.users, ctx.games, cfg.persistIntervalSec), "persist").start();
+        new Thread(new PersistenceThread(ctx.users, cfg.persistIntervalSec), "persist").start();
 
         // 5) shutdown hook: SIGTERM/SIGINT -> persist prima di uscire (no perdita ultima partita)
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

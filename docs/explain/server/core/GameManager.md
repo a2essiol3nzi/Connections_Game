@@ -8,7 +8,9 @@ storico PERSISTITO** e aggiorna le statistiche (`UserStore`).
 
 ## Stato interno
 - `loader`, `durationSec`, `rnd`, `games` (`CyclicGameIterator`).
-- `current` — `ActiveGame` globale (null solo se loader vuoto).
+- `current` — `ActiveGame` **`volatile`**: visibilità cross-thread senza lock in
+  lettura; assegnato SOLO in `rotate()` (synchronized) e nel costruttore, sempre
+  costruito PRIMA della pubblicazione → nessun oggetto "semivisto".
 - `history` — `ConcurrentHashMap<Integer,GameHistory>` partite CONCLUSE, chiave =
   **`roundId`**.
   - `GameHistory { roundId, sourceGameId, GameData.Group[4] (tema+parole),
@@ -17,43 +19,61 @@ storico PERSISTITO** e aggiorna le statistiche (`UserStore`).
 - `onlineUsers` — `Set<Integer>` (ConcurrentHashMap-backed) per auto-join.
 - `nextRoundId` — `AtomicInteger` monotono (non si ripete al wrap).
 - `HISTORY_CAP = 10_000` (trim del `roundId` più basso).
-- `historyFile`.
+- `historyFile` + `ioLock` (monitor dedicato per I/O su disco).
 
 ## Operazioni (identificazione per **userId** immutabile)
-- `registerLogin(userId)` / `registerLogout(userId)` — registry online
-  (`synchronized`, atomico vs `rotate`).
-- `logoutUser(userId, UdpRegistry)` — rimuove da online **e** da UDP registry
-  (logout atomico).
-- `join(userId)`, `submitProposal(userId, words)` — `submitProposal` è
-  **`synchronized`** (serializza con `rotate`, evita TOCTOU tra `current()` e
-  `submit()`).
+- `current()` — lettura **lock-free** (campo `volatile`). Sbloccata la path di
+  lettura (`gameInfo`/`gameStats`/`join`/`submitProposal`).
+- `rotate(nowMs)` — `synchronized`: `current = makeNext()` + auto-join di tutti
+  gli online. `makeNext()` fa I/O (loader.next) sotto il monitor, ma una volta
+  per partita (~600s) → `ponytail:` impatto trascurabile; fix quando misurabile
+  (= costruire la next fuori dal monitor nello scheduler e qui solo swap+auto-join).
+- `registerLogin` / `registerLogout` / `logoutUser` — `synchronized` (registry
+  online atomico vs `rotate`).
+- `join(userId)` — lock-free (usa `current()`).
+- `submitProposal(userId, words)` — **NON più `synchronized`** (era il collo di
+  bottiglia): la TOCTOU tra `current()` e `submit()` è gestita a valle da
+  `ActiveGame.finalized` (AtomicBoolean) + `finalizeGame` idempotente — un submit
+  sull'ex-partita al rotate torna `ERR_FINISHED` (semantica sana). Il vero
+  parallelismo viene dal lock granulare su `PlayerState` in `ActiveGame.submit`.
 - `gameInfo(userId, roundId, store)` → **`GameInfoPayload`** —
-  `roundId==-1` (default) **o round corrente** ⇒ live (id, `sourceGameId`,
-  `remainingSec`, stato, `remainingWords`); `roundId` = altro round ⇒ storico
-  (`assignment`+tema + esito del giocatore). Ritorna `null` su errore (handler →
-  `ERR_NO_ACTIVE_GAME`/`ERR_GAME_NOT_FOUND`).
-- `gameStats(roundId)` → **`GameStatsPayload`** — `-1` o round corrente ⇒ live
-  (in corso/finiti/vinti + `remainingSec`); altro ⇒ da `history` (media).
+  `roundId==-1` (default) **o round corrente** ⇒ live; altro round ⇒ storico.
+  `null` su errore (handler → `ERR_NO_ACTIVE_GAME`/`ERR_GAME_NOT_FOUND`).
+- `gameStats(roundId)` → **`GameStatsPayload`** — live o da `history` (media).
 - `leaderboard(playerName, topK, store)` → **`LeaderboardPayload`** — snapshot
-  `(id,score)` con lock granulare per utente, **sort + rank DOPO** lo snapshot;
-  weak consistency accettata (read-only). `null` se `playerName` inesistente ⇒
-  `ERR_PLAYER_NOT_FOUND`.
+  `(id,score)` con lock granulare per utente, sort+rank DOPO; weak consistency
+  accettata (read-only). `null` ⇒ `ERR_PLAYER_NOT_FOUND`.
 - `playerStats(userId, store)` → **`PlayerStatsPayload`** — snapshot di TUTTI i
-  campi (+copia `mistakeHistogram`) sotto `synchronized(u)` per evitare dirty
-  read. `null` ⇒ `ERR_USER_NOT_FOUND`.
-- `finalizeGame(store)` — **idempotente** (`finalized.compareAndSet(false,true)`):
-  sigilla, scrive `GameHistory` (chiave userId), aggiorna statistiche utente.
-- `persistHistory()` / `loadHistory()` — JSON atomico (tmp+`ATOMIC_MOVE`);
-  `loadHistory` ripristina `nextRoundId`.
+  campi sotto `synchronized(u)`. `null` ⇒ `ERR_USER_NOT_FOUND`.
+- `finalizeGame(store)` — `synchronized`, **idempotente**
+  (`finalized.compareAndSet(false,true)`): sigilla, scrive `GameHistory` (chiave
+  userId), aggiorna statistiche utente. Legge lo stato di ogni giocatore sotto
+  **`synchronized(ps)`** esplicito (necessario: con `submitProposal` non più
+  serializzato dal monitor, protegge da submit concorrenti in finalizzazione).
+- `persistHistory()` — NON `synchronized`; **streamed** `GSON.toJson(history, w)`
+  direttamente sul writer (nessuna `String`/`JsonElement` intermedia dello
+  storico: memoria extra O(1)); I/O su `ioLock` dedicato, non blocca il gameplay.
+  L'`history.put` avviene solo in `finalizeGame` (dallo scheduler, unico
+  scrittore) → nessun lock aggiuntivo per lo snapshot.
+- `loadHistory()` — ripristina `history` e `nextRoundId`.
 
 ## Concorrenza
-`rotate`, `current`, `registerLogin`, `registerLogout`, `submitProposal`,
-`finalizeGame`, `persistHistory` sono `synchronized`. `submit` in `ActiveGame`
-usa lock granulare su `PlayerState`. `finalized` `AtomicBoolean`. Lo storico è
-`ConcurrentHashMap`. `leaderboard`/`playerStats` leggono le statistiche sotto
-`synchronized(u)` (paired col writer in `finalizeGame`) ma con **weak consistency**
-tra utenti diversi (snapshot sfocata accettabile per query read-only). Solo
-`synchronized`/`Atomic*`/`ConcurrentHashMap` (NO `locks.*`).
+`rotate`, `registerLogin`, `registerLogout`, `logoutUser`, `finalizeGame` sono
+`synchronized`. `current()` / `join()` / `submitProposal()` sono **lock-free**
+(campo `volatile` + `AtomicBoolean` + lock granulare in `ActiveGame`). `submit`
+in `ActiveGame` usa lock per-`PlayerState`; `finalizeGame` legge `ps` sotto
+`synchronized(ps)`. Lo storico è `ConcurrentHashMap`; `history` ha UNICO
+scrittore (scheduler via `finalizeGame`). `leaderboard`/`playerStats` leggono le
+stat sotto `synchronized(u)` (weak consistency tra utenti, accettabile per query
+read-only). Solo `synchronized`/`volatile`/`Atomic*`/`ConcurrentHashMap`
+(NO `locks.*`).
+
+## Persistenza storico (scelta didattica)
+Storico intero riscritto su file JSON atomico (tmp + `ATOMIC_MOVE`). In
+produzione si userebbe un DB append-only/WAL; qui il vincolo del progetto è
+"persistenza su file JSON" e lo storico è bounded (10k, ~MB) e cambia UNA volta
+per partita → riscrittura integrale adeguata (niente early-optimization). Gson
+streamed verso il writer: O(1) di memoria extra.
 
 ## Collegamenti
 - `protocol/payload/*`: tipi di ritorno (`GameInfoPayload`, `GameStatsPayload`,
@@ -61,6 +81,7 @@ tra utenti diversi (snapshot sfocata accettabile per query read-only). Solo
 - `core/ActiveGame`/`PlayerState`: crea e interroga.
 - `loader/GameLoader` + `CyclicGameIterator`: sorgente.
 - `core/UserStore`: storico per userId, statistiche.
-- `network/GameScheduler`: `rotate`/`finalizeGame`/`persistHistory`.
-- `core/ServerMain` + `persistence/PersistenceThread`: persistenza/shutdown.
+- `network/GameScheduler`: `rotate`/`finalizeGame`/`persistHistory`/`persist` utenti.
+- `core/ServerMain` + `persistence/PersistenceThread`: persistenza/shutdown
+  (il timer salva solo utenti; lo storico lo salva scheduler + shutdown hook).
 - `network/UdpRegistry`: `logoutUser` lo pulisce.

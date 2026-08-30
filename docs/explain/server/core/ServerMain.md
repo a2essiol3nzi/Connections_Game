@@ -1,31 +1,32 @@
 # `core/ServerMain` — entry point del server
 
 ## Ruolo
-Punto di ingresso (`main`). Orchestrano l'avvio: legge config, crea il loader
-pigro delle partite, costruisce il `Context` (risorse condivise), avvia gli
-thread di supporto (scheduler, persistenza), **registra lo shutdown hook** e
-infine apre l'acceptor TCP sul thread principale (bloccante).
+Avvia il server: config → loader → Context → thread di supporto → shutdown hook
+→ acceptor TCP sul thread principale.
 
 ## Sequenza di avvio
-1. **Config** — `ServerConfig.load(path)`; `path` = `args[0]` o `"server.properties"`.
-   Errore di lettura → `System.exit(2)`.
-2. **Loader partite** — `new GameLoader(cfg.gamesFile)` (streaming Gson, O(1)).
-   Errore → `System.exit(3)`. Log: `[Server] prepared <total> games from <file>`.
-3. **Risorse condivise** — `new Context(cfg, loader)` (crea store/manager/registry UDP/notifier).
-4. **Thread supporto** — `GameScheduler` (games/users/notifier) e `PersistenceThread`
-   (users/**games**/intervalSec): entrambi avviati come `Thread`.
-5. **Shutdown hook** — `addShutdownHook(...)`: su SIGTERM/SIGINT chiama
-   `ctx.users.persist()` **e** `ctx.games.persistHistory()` (salva ultima
-   partita + storico prima di uscire).
-6. **Acceptor TCP** — `Executors.newFixedThreadPool(cfg.poolSize)` +
-   `ConnectionAcceptor.run()` sul main thread.
+1. **Config**: `ServerConfig.load(cfgPath)` (default `server.properties`; su
+   `IOException` → `System.exit(2)`).
+2. **Loader**: `new GameLoader(cfg.gamesFile)` (streaming Gson, memoria O(1): le
+   partite non stanno mai tutte in RAM); su errore → `System.exit(3)`.
+3. **Context**: `new Context(cfg, loader)` (risorse condivise: `users`, `games`,
+   `udpRegistry`, `notifier`).
+4. **Thread di supporto**: `GameScheduler` (thread "scheduler") e
+   `PersistenceThread(ctx.users, cfg.persistIntervalSec)` (thread "persist").
+5. **Shutdown hook**: su SIGTERM/SIGINT salva `users.persist()` +
+   `games.persistHistory()` → nessuna perdita dell'ultima partita finalizzata.
+6. **Acceptor TCP**: `ExecutorService` fixed pool (`cfg.poolSize`) +
+   `ConnectionAcceptor` sul thread principale (bloccante).
 
-## Dipendenze
-`ServerConfig`, `GameLoader`, `Context`, `ConnectionAcceptor`, `GameScheduler`,
-`PersistenceThread`. Nessuna logica di gioco qui: solo wiring.
+## Note
+- `PersistenceThread` riceve **solo `UserStore`** (non più `GameManager`): il
+  timer salva solo gli utenti; lo storico partite lo salvano scheduler
+  (post-finalize) e shutdown hook.
+- Pool size = numero massimo di connessioni/concorrenti servite
+  contemporaneamente (una connessione persistente occupa un thread).
 
 ## Collegamenti
-- `core/ServerConfig` / `core/Context`: parametri e risorse.
-- `network/ConnectionAcceptor`, `network/GameScheduler`, `persistence/PersistenceThread`:
-  thread di servizio.
-- `core/UserStore` + `core/GameManager`: lo shutdown hook li persiste.
+- `core/ServerConfig`, `core/Context`, `core/GameManager`, `core/UserStore`.
+- `loader/GameLoader`.
+- `network/GameScheduler`, `network/ConnectionAcceptor`.
+- `persistence/PersistenceThread`.

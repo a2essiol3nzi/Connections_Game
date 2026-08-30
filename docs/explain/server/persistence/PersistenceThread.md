@@ -1,24 +1,26 @@
-# `persistence/PersistenceThread` — snapshot periodico (utenti + storico)
+# `persistence/PersistenceThread` — persistenza periodica
 
 ## Ruolo
-Thread di servizio che salva su JSON a intervalli regolari (§2.2): ora persiste
-**sia** `UserStore` **sia** lo storico partite `GameManager` (non solo utenti).
+Thread che salva gli **utenti** su JSON a intervalli fissi. NOTA: lo storico
+partite NON viene più salvato qui — cambia una sola volta per partita e lo
+salvano già `GameScheduler` (subito dopo `finalizeGame`) e lo shutdown hook in
+`ServerMain`. Il timer quindi non ha bisogno dello storico: evitava uno stallo
+inutile ogni `intervalSec`.
 
-## Campi
-- `users` — `UserStore` (`persist()`).
-- `games` — `GameManager` (`persistHistory()`).
-- `intervalSec` — periodo (da `ServerConfig.persistIntervalSec`).
+## Stato interno
+- `users` (`UserStore`), `intervalSec`.
 
-## Flusso (`run`, ciclo infinito)
-`Thread.sleep(intervalSec*1000)` → `users.persist()` + `games.persistHistory()`
-→ log `"[Persist] users + history saved"`. `InterruptedException` ⇒ `interrupt()`
-+ `break`; altra `Exception` ⇒ log e continua.
+## Flusso
+`while(true)`: `sleep(intervalSec*1000)` → `users.persist()` → log. Su
+`InterruptedException` imposta l'interrupt e termina; su altre `Exception` logga
+e continua.
 
 ## Concorrenza
-Thread dedicato. `persist()`/`persistHistory()` sono `synchronized` (store/
-manager) ⇒ scrittura serializzata con `GameScheduler` e shutdown hook.
+Nessuno stato proprio condiviso: delega la sincronizzazione a `users.persist()`
+(che serializza l'I/O su `ioLock`, fuori dal monitor `this` dello store).
 
 ## Collegamenti
-- `core/UserStore` + `core/GameManager`: gli unici chiamati.
-- `core/ServerMain`: crea e avvia il thread.
-- `core/ServerConfig`: `persistIntervalSec`.
+- `core/UserStore`: `persist()`.
+- `core/ServerMain`: istanzia il thread.
+- `network/GameScheduler`: anche lui salva utenti (post-finalize), event-driven;
+  i due si serializzano su `UserStore.ioLock`.
