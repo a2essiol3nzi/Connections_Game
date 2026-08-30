@@ -24,21 +24,21 @@
     "id": 2,
     "username": "ale",
     "password": "a",
-    "cumulativeScore": 18,
-    "puzzlesPlayed": 4,
-    "puzzlesWon": 0,
+    "cumulativeScore": 60,
+    "puzzlesPlayed": 7,
+    "puzzlesWon": 2,
     "puzzlesLost": 0,
-    "notFinished": 4,
+    "notFinished": 5,
     "currentStreak": 0,
-    "maxStreak": 0,
-    "perfectPuzzles": 0,
+    "maxStreak": 2,
+    "perfectPuzzles": 2,
     "mistakeHist": [
+      2,
       0,
       0,
       0,
       0,
-      0,
-      4
+      5
     ]
   },
   {
@@ -444,12 +444,12 @@
     "id": 22,
     "username": "user20",
     "password": "passuser20",
-    "cumulativeScore": 14,
-    "puzzlesPlayed": 2,
+    "cumulativeScore": -6,
+    "puzzlesPlayed": 5,
     "puzzlesWon": 1,
-    "puzzlesLost": 1,
-    "notFinished": 0,
-    "currentStreak": 1,
+    "puzzlesLost": 2,
+    "notFinished": 2,
+    "currentStreak": 0,
     "maxStreak": 1,
     "perfectPuzzles": 0,
     "mistakeHist": [
@@ -457,8 +457,8 @@
       0,
       1,
       0,
-      1,
-      0
+      2,
+      2
     ]
   }
 ]

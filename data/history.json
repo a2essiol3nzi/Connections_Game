@@ -1,1 +1,170 @@
-{}
+{
+  "1": {
+    "roundId": 1,
+    "sourceGameId": 0,
+    "groups": [
+      {
+        "theme": "WET WEATHER",
+        "words": [
+          "RAIN",
+          "SNOW",
+          "HAIL",
+          "SLEET"
+        ]
+      },
+      {
+        "theme": "NBA TEAMS",
+        "words": [
+          "HEAT",
+          "BUCKS",
+          "NETS",
+          "JAZZ"
+        ]
+      },
+      {
+        "theme": "KEYBOARD KEYS",
+        "words": [
+          "SHIFT",
+          "RETURN",
+          "TAB",
+          "OPTION"
+        ]
+      },
+      {
+        "theme": "PALINDROMES",
+        "words": [
+          "KAYAK",
+          "RACECAR",
+          "MOM",
+          "LEVEL"
+        ]
+      }
+    ],
+    "entries": {
+      "2": {
+        "correct": 3,
+        "errors": 0,
+        "score": 18,
+        "outcome": "WON"
+      },
+      "22": {
+        "correct": 0,
+        "errors": 4,
+        "score": -16,
+        "outcome": "LOST"
+      }
+    }
+  },
+  "2": {
+    "roundId": 2,
+    "sourceGameId": 1,
+    "groups": [
+      {
+        "theme": "FOOTWEAR",
+        "words": [
+          "SNEAKER",
+          "PUMP",
+          "LOAFER",
+          "BOOT"
+        ]
+      },
+      {
+        "theme": "UNITS OF LENGTH",
+        "words": [
+          "MILE",
+          "YARD",
+          "LEAGUE",
+          "FOOT"
+        ]
+      },
+      {
+        "theme": "MAGAZINES",
+        "words": [
+          "ESSENCE",
+          "TIME",
+          "PEOPLE",
+          "US"
+        ]
+      },
+      {
+        "theme": "LETTER HOMOPHONES",
+        "words": [
+          "ARE",
+          "WHY",
+          "QUEUE",
+          "SEA"
+        ]
+      }
+    ],
+    "entries": {
+      "2": {
+        "correct": 3,
+        "errors": 0,
+        "score": 18,
+        "outcome": "WON"
+      },
+      "22": {
+        "correct": 0,
+        "errors": 1,
+        "score": -4,
+        "outcome": "NOT_FINISHED"
+      }
+    }
+  },
+  "3": {
+    "roundId": 3,
+    "sourceGameId": 2,
+    "groups": [
+      {
+        "theme": "FACIAL FEATURES",
+        "words": [
+          "EYE",
+          "MOUTH",
+          "NOSE",
+          "CHEEK"
+        ]
+      },
+      {
+        "theme": "SYNONYMS FOR EAT",
+        "words": [
+          "GOBBLE",
+          "CHOW",
+          "SCARF",
+          "WOLF"
+        ]
+      },
+      {
+        "theme": "\"DOG BREEDS, INFORMALLY\"",
+        "words": [
+          "PIT",
+          "PEKE",
+          "LAB",
+          "POM"
+        ]
+      },
+      {
+        "theme": "MEMBERS OF A TRIO",
+        "words": [
+          "TENOR",
+          "KING",
+          "STOOGE",
+          "AMIGO"
+        ]
+      }
+    ],
+    "entries": {
+      "2": {
+        "correct": 1,
+        "errors": 0,
+        "score": 6,
+        "outcome": "NOT_FINISHED"
+      },
+      "22": {
+        "correct": 0,
+        "errors": 0,
+        "score": 0,
+        "outcome": "NOT_FINISHED"
+      }
+    }
+  }
+}

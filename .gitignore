@@ -4,8 +4,3 @@ dist/*
 
 # dir di config IDE
 .vscode/*
-
-# file "db"
-data/users.json
-data/history.json
-data/games.json
