@@ -33,7 +33,7 @@ Gioco "Connections" (NYT) implementato in **Java** con architettura **client-ser
 - `loader/`: `GameLoader` (streaming pigro, `CyclicGameIterator`).
 - `model/`: `GameData` (POJO partite).
 - `network/`: `ConnectionAcceptor`, `ClientHandler`, `GameScheduler`, `UdpNotifier`, `UdpRegistry`.
-- `persistence/`: `PersistenceThread` (utenti+storico).
+- persistenza utenti/storico: **event-driven** (in `UserStore` e `GameManager`), NESSUNA classe `persistence/` — il vecchio `PersistenceThread` è stato rimosso.
 
 ## Package condiviso (server + client)
 - `protocol/` (top-level in `src/`, non sotto `server/`): `Request`, `Response`,
@@ -58,7 +58,7 @@ Gioco "Connections" (NYT) implementato in **Java** con architettura **client-ser
 5. Libreria JSON → **Gson** (jar allegato).
 6. Codici errore → **testuali** centralizzati in `protocol/Errors` (enum).
 7. Sentinel "partita corrente" → `roundId = -1` (INT). `gameId` sorgente si ripete; `roundId` monotono.
-8. Persistenza → **utenti + storico partite** (JSON separati).
+8. Persistenza → **utenti + storico partite** (JSON separati), **event-driven senza timer** (deltas account in `register`/`updateCredentials`; stats/storico nel scheduler post-finalize; shutdown hook all'uscita).
 9. Outcome per giocatore ∈ {WON, LOST(4 errori), NOT_FINISHED(timeout)}.
 10. Mistake Histogram: bin vittorie 0-3 errori + fallite(4) + not_finished.
 11. Notifiche UDP → **unicast** a endpoint registrati (`UdpRegistry`: IP TCP + port dal login).

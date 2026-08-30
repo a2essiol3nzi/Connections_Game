@@ -11,17 +11,18 @@ Avvia il server: config → loader → Context → thread di supporto → shutdo
    partite non stanno mai tutte in RAM); su errore → `System.exit(3)`.
 3. **Context**: `new Context(cfg, loader)` (risorse condivise: `users`, `games`,
    `udpRegistry`, `notifier`).
-4. **Thread di supporto**: `GameScheduler` (thread "scheduler") e
-   `PersistenceThread(ctx.users, cfg.persistIntervalSec)` (thread "persist").
+4. **Scheduler**: avvia SOLO `GameScheduler` (thread "scheduler"). **Nessun
+   `PersistenceThread`**: la persistenza è event-driven (vedi sotto).
 5. **Shutdown hook**: su SIGTERM/SIGINT salva `users.persist()` +
    `games.persistHistory()` → nessuna perdita dell'ultima partita finalizzata.
 6. **Acceptor TCP**: `ExecutorService` fixed pool (`cfg.poolSize`) +
    `ConnectionAcceptor` sul thread principale (bloccante).
 
 ## Note
-- `PersistenceThread` riceve **solo `UserStore`** (non più `GameManager`): il
-  timer salva solo gli utenti; lo storico partite lo salvano scheduler
-  (post-finalize) e shutdown hook.
+- **Persistenza event-driven (niente timer)**: i deltas account (register/rename)
+  si salvano in `UserStore.register`/`updateCredentials` via `persistQuiet()`; le
+  stats/storico li salva lo scheduler post-`finalizeGame`. Il solo shutdown hook
+  copre l'ultima partita finalizzata all'uscita.
 - Pool size = numero massimo di connessioni/concorrenti servite
   contemporaneamente (una connessione persistente occupa un thread).
 
@@ -29,4 +30,3 @@ Avvia il server: config → loader → Context → thread di supporto → shutdo
 - `core/ServerConfig`, `core/Context`, `core/GameManager`, `core/UserStore`.
 - `loader/GameLoader`.
 - `network/GameScheduler`, `network/ConnectionAcceptor`.
-- `persistence/PersistenceThread`.

@@ -3,7 +3,6 @@ package server.core;
 import server.loader.GameLoader;
 import server.network.ConnectionAcceptor;
 import server.network.GameScheduler;
-import server.persistence.PersistenceThread;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
@@ -16,7 +15,7 @@ import java.util.concurrent.Executors;
  *   1. legge la config (server.properties o path passato come argomento);
  *   2. crea il GameLoader (streaming Gson, memoria O(1): nessuna partita in RAM);
  *   3. costruisce il Context (risorse condivise);
- *   4. avvia scheduler partita e thread di persistenza;
+ *   4. avvia lo scheduler partita (la persistenza è EVENT-DRIVEN);
  *   5. registra lo shutdown hook (su SIGTERM/SIGINT salva UserStore su disco);
  *   6. apre l'acceptor TCP sul thread principale (bloccante).
  */
@@ -49,9 +48,8 @@ public class ServerMain {
         // 3) risorse condivise
         Context ctx = new Context(cfg, loader);
 
-        // 4) thread di supporto
+        // 4) scheduler partita (persistenza utenti event-driven)
         new Thread(new GameScheduler(ctx.games, ctx.users, ctx.notifier), "scheduler").start();
-        new Thread(new PersistenceThread(ctx.users, cfg.persistIntervalSec), "persist").start();
 
         // 5) shutdown hook: SIGTERM/SIGINT -> persist prima di uscire (no perdita ultima partita)
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

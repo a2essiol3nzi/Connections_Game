@@ -82,6 +82,7 @@ streamed verso il writer: O(1) di memoria extra.
 - `loader/GameLoader` + `CyclicGameIterator`: sorgente.
 - `core/UserStore`: storico per userId, statistiche.
 - `network/GameScheduler`: `rotate`/`finalizeGame`/`persistHistory`/`persist` utenti.
-- `core/ServerMain` + `persistence/PersistenceThread`: persistenza/shutdown
-  (il timer salva solo utenti; lo storico lo salva scheduler + shutdown hook).
+- `core/ServerMain`: persistenza/shutdown (shutdown hook: `persist` + `persistHistory`;
+  avvio scheduler). L'event-driven dei deltas account sta in
+  `UserStore.register`/`updateCredentials` (`persistQuiet()`).
 - `network/UdpRegistry`: `logoutUser` lo pulisce.

@@ -45,17 +45,17 @@ import protocol.Errors;
  *   - `nextId` è un AtomicInteger (assegnazione id thread-safe);
  *
  * PERSISTENZA
- * Utenti in RAM ("pochi", accessi frequenti); snapshot JSON periodico +
- * atomico (temp + rename).
+ * Utenti in RAM ("pochi", accessi frequenti); snapshot JSON atomico (temp + rename).
  *
- * `persist()` è `synchronized`: viene chiamato da TRE fonti concorrenti e
- * serializza la scrittura su file.tmp + ATOMIC_MOVE, evitando collisioni:
- *   1) PersistenceThread (timer periodico);
- *   2) GameScheduler, subito dopo finalizeGame (persistenza event-driven);
- *   3) shutdown hook in ServerMain (SIGTERM/SIGINT) -> nessuna perdita
- *      dell'ultima partita finalizzata all'uscita.
- * In questo modo si cerca di minimizzare la perdita di informazioni 
- * su chiusure inaspettate o crash.
+ * PERSISTENZA EVENT-DRIVEN (nessun timer): il salvataggio avviene
+ *   1) register / updateCredentials (deltas account, su disco SUBITO dopo il successo);
+ *   2) GameScheduler dopo finalizeGame (stats maturate a fine partita);
+ *   3) shutdown hook in ServerMain (SIGTERM/SIGINT) -> nessuna perdita dell'ultima
+ *      partita finalizzata all'uscita.
+ * Il disk I/O va su `ioLock` dedicato, cosi' register/login non si bloccano sulla
+ * scrittura; le sorgenti concorrenti si serializzano comunque tra loro via `ioLock`.
+ * In questo modo si minimizza la perdita di informazioni su chiusure inaspettate/
+ * crash: i deltas account vengono salvati appena avvengono, non dopo fino a 30s.
  */
 public class UserStore {
 
@@ -107,6 +107,7 @@ public class UserStore {
             nameToId.put(username, u.id);
             byId.put(u.id, u);
         }
+        persistQuiet();
         return null;
     }
 
@@ -151,6 +152,7 @@ public class UserStore {
                 }
             }
         }
+        persistQuiet();
         return null; // OK
     }
 
@@ -224,6 +226,16 @@ public class UserStore {
                 GSON.toJson(arr, w);
             }
             Files.move(tmp, p, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        }
+    }
+
+    // Persist event-driven SILENZIOSO (chiamato da register/updateCredentials):
+    // l'IOException non deve diventare un codice Errors per il client, quindi la
+    // si logga e si prosegue (il shutdown hook / persist seguente recupererà).
+    private void persistQuiet() {
+        try { persist(); }
+        catch (IOException e) {
+            System.err.println("[UserStore] persist failed: " + e.getMessage());
         }
     }
 

@@ -26,6 +26,7 @@ sincronizzazione.
 
 ## Collegamenti
 - `core/ServerMain`: l'unico che lo costruisce.
-- `network/ClientHandler`, `network/GameScheduler`, `persistence/PersistenceThread`:
-  lo ricevono per accedere a store/manager/notifier/udpRegistry.
+- `network/ClientHandler`, `network/GameScheduler`: lo ricevono per accedere a
+  store/manager/notifier/udpRegistry. (Nessun `PersistenceThread`: persistenza
+  event-driven.)
 - `network/UdpRegistry`, `network/UdpNotifier`: creati qui.

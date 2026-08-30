@@ -20,21 +20,26 @@ Won/Lost`, `notFinished`, `currentStreak`/`maxStreak`, `perfectPuzzles`,
 
 ## Operazioni
 - `register(username, psw)` — `synchronized(this)`: verifica username, assegna
-  `nextId`, popola `nameToId`+`byId`. `null`=OK, altrimenti `Errors`.
+  `nextId`, popola `nameToId`+`byId`. Poi **`persistQuiet()`** (persist
+  event-driven, fuori dal lock). `null`=OK, altrimenti `Errors`.
 - `login(username, psw)` — lookup sotto `synchronized(this)`, confronto psw sotto
   `synchronized(u)`. `null`=OK.
 - `updateCredentials(oldUser, oldPsw, newUser, newPsw)` — `synchronized(this)` +
   `synchronized(u)`: rinomina solo l'indice secondario (`nameToId`), `byId` e le
-  strutture keyed-by-id restano invariate. `null`=OK.
+  strutture keyed-by-id restano invariate. Poi **`persistQuiet()`** (persist
+  event-driven, fuori dal lock). `null`=OK.
 - `allUsers()` — lista snapshot per classifica.
 - `hasUser(name)`, `getByName(name)` (atomica sotto `this`), `getById(id)`
   (lookup diretto, l'id non cambia MAI).
-- `persist()` — **NON `synchronized`**: build del JSON in-memory sotto `this`
-  (cattura `int`/`mistakeHist` sotto `synchronized(u)`, accoppiata col writer in
-  `finalizeGame`), **disk I/O su `ioLock`** dedicato. Le tre fonti concorrenti
-  (timer/scheduler/shutdown) si serializzano tra loro tramite `ioLock`, ma
-  `register`/`login` (che usano `synchronized(this)`) non si bloccano sulla
-  scrittura su disco. Scrittura atomica (tmp + `ATOMIC_MOVE`).
+- `persist()` — build del JSON in-memory sotto `this` (cattura `int`/`mistakeHist`
+  sotto `synchronized(u)`, accoppiata col writer in `finalizeGame`), **disk I/O
+  su `ioLock`** dedicato. Le fonti concorrenti (register/rename, scheduler
+  post-finalize, shutdown) si serializzano tra loro tramite `ioLock`; il lock
+  `this` resta libero durante la scrittura su disco. Scrittura atomica
+  (tmp + `ATOMIC_MOVE`).
+- `persistQuiet()` — wrapper di `persist()` che logga l'`IOException` (chiamato
+  da `register`/`updateCredentials`): un fallimento di scrittura non diventa un
+  codice `Errors` per il client; lo recupera lo shutdown hook / persist seguente.
 - `load()` — all'avvio (single-threaded): ripristina `byId`/`nameToId`/`nextId`;
   su file corrotto rinomina in `.corrupt` e parte vuoto.
 
@@ -44,15 +49,22 @@ Nessun lock globale per le operazioni business: `byId`/`nameToId` sono
 `synchronized(u)` → utenti diversi non si bloccano. `register`/`login`/
 `updateCredentials`/`getByName` serializzano il SOLO accesso combinato alle due
 mappe con `synchronized(this)` (breve). `persist` separa snapshot in-memory
-(`this`) dall'I/O (`ioLock`). Solo `synchronized`/`Atomic*`/`ConcurrentHashMap`.
+(`this`) dall'I/O (`ioLock`); `persistQuiet` la invoca fuori dal lock `this`
+(register/rename persistono senza tenere bloccato lo store durante la scrittura).
+Solo `synchronized`/`Atomic*`/`ConcurrentHashMap`.
 
 ## Persistenza
-Snapshot JSON periodico (PersistenceThread) + event-driven (GameScheduler
-post-finalize) + shutdown hook (ServerMain). L'I/O è fuori dal monitor `this`.
+**Event-driven, nessun timer** (il vecchio `PersistenceThread` è stato rimosso):
+- `register` / `updateCredentials` → `persistQuiet()` subito dopo il successo
+  (deltas account: perdita a hard-crash = 0, prima era ≤30s);
+- `GameScheduler` post-finalize → stats/storico;
+- shutdown hook (`ServerMain`) → ultima partita finalizzata.
+L'I/O è fuori dal monitor `this` (su `ioLock`).
 
 ## Collegamenti
 - `protocol/Errors`: codici di ritorno (enum centralizzato, `null`=OK).
 - `core/GameManager`: statistiche in `finalizeGame`, storico per userId,
   `leaderboard`/`playerStats`.
 - `network/ClientHandler`: `register`/`login`/`updateCredentials`/`getById`.
-- `persistence/PersistenceThread` + `core/ServerMain`: persistenza periodica/shutdown.
+- `core/ServerMain`: shutdown hook (`persist`) + avvio scheduler.
+- `network/GameScheduler`: `persist` post-finalize (stats).

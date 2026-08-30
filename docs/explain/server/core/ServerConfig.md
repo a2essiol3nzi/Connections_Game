@@ -11,7 +11,6 @@ NO interattivo). I campi sono `public final` e immutabili dopo la lettura.
 | `udpPort` | int | `12346` | porta notifiche UDP |
 | `gameDurationSec` | int | `600` | durata partita (10 min) |
 | `poolSize` | int | `16` | thread pool acceptor |
-| `persistIntervalSec` | int | `30` | intervallo snapshot utenti+storico |
 | `gamesFile` | String | `data/games.json` | file partite (array JSON) |
 | `persistFile` | String | `data/users.json` | file utenti |
 | `historyFile` | String | `data/history.json` | file **storico partite** (nuovo) |

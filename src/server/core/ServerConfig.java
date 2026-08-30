@@ -11,7 +11,6 @@ public class ServerConfig {
     public final int udpPort;
     public final int gameDurationSec;
     public final int poolSize;
-    public final int persistIntervalSec;
     public final String gamesFile;
     public final String persistFile;
     public final String historyFile;
@@ -21,7 +20,6 @@ public class ServerConfig {
         udpPort = Integer.parseInt(p.getProperty("udp.port", "12346"));
         gameDurationSec = Integer.parseInt(p.getProperty("game.duration.sec", "600"));
         poolSize = Integer.parseInt(p.getProperty("pool.size", "16"));
-        persistIntervalSec = Integer.parseInt(p.getProperty("persist.interval.sec", "30"));
         gamesFile = p.getProperty("games.file", "data/games.json");
         persistFile = p.getProperty("persist.file", "data/users.json");
         historyFile = p.getProperty("history.file", "data/history.json");

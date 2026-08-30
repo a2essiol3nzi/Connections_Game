@@ -14,8 +14,9 @@ la scadenza di `current` → finalizza gli esiti → **persist event-driven** (u
 1. `g = gameMan.current()`; se null → `sleep(1000)`, riprova.
 2. `waitMs = g.endTimeMs - now`; se > 0 → `sleep(waitMs)`.
 3. `gameMan.finalizeGame(users)` — registra esiti + statistiche.
-4. `users.persist()` + `gameMan.persistHistory()` — persistenza event-driven (non
-   attende il timer del `PersistenceThread`); gestisce `IOException` con log.
+4. `users.persist()` — persistenza utenti (stats) event-driven post-finalize;
+   gestisce `IOException` con log. (Lo storico `gameMan.persistHistory()` è
+   salvato qui insieme.)
 5. `notifier.notifyEnd(g.participants(), {type:"GAME_ENDED", gameId, roundId})`.
 6. `gameMan.rotate(now)` — nuova partita (auto-join degli `onlineUsers`).
 
@@ -30,11 +31,12 @@ la scadenza di `current` → finalizza gli esiti → **persist event-driven** (u
 Coordinazione via `Thread.sleep` fino a `endTimeMs`; `sleep()` ricalcola il
 deadline ed effettua **retry** su `InterruptedException` (non esce dal ciclo).
 Lo swap di `ActiveGame` in `GameManager.rotate` è `synchronized`.
-`persist()`/`persistHistory()` sono `synchronized` lato store/manager ⇒
-serializzati con timer e shutdown hook.
+`persist()`/`persistHistory()` usano l'`ioLock` dedicato (rispettivamente in
+`UserStore`/`GameManager`) ⇒ serializzati tra loro e con l'event-driven di
+`register`/`updateCredentials` (nessun timer).
 
 ## Collegamenti
 - `core/GameManager`: `current`/`finalizeGame`/`rotate`/`persistHistory`.
 - `core/ActiveGame`: legge `endTimeMs`, `finalized`, `roundId`, `participants()`.
 - `network/UdpNotifier`: invio notifica async (payload con `roundId`).
-- `core/UserStore` + `persistence/PersistenceThread`: `persist()`.
+- `core/UserStore`: `persist()` (stats post-finalize).
