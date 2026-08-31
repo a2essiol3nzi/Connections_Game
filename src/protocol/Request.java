@@ -26,7 +26,7 @@ public class Request {
     public List<String> words;
 
     // requestGameInfo / requestGameStats (-1 = partita corrente)
-    public Integer gameId;
+    public Integer roundId;
 
     // requestLeaderboard
     public String playerName;

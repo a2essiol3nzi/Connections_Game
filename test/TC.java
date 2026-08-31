@@ -72,12 +72,12 @@ public final class TC implements AutoCloseable {
     }
 
     public Response gameInfo(int gameId) throws IOException {
-        Request r = req("requestGameInfo"); r.gameId = gameId; 
+        Request r = req("requestGameInfo"); r.roundId = gameId; 
         return call(r);
     }
 
     public Response gameStats(int gameId) throws IOException {
-        Request r = req("requestGameStats"); r.gameId = gameId; 
+        Request r = req("requestGameStats"); r.roundId = gameId; 
         return call(r);
     }
 

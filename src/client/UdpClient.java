@@ -63,10 +63,11 @@ public class UdpClient implements Runnable, AutoCloseable {
 
     // Legge l'esito della partita conclusa con retry.
     private void printResult(int roundId) {
+        Cli.clearInputLine(); // pulisci stdin di client
         System.out.println("\n[notifica] partita round " + roundId + " terminata - recupero esito...");
         Request req = new Request();
         req.operation = "requestGameInfo";
-        req.gameId = roundId;
+        req.roundId = roundId;
         for (int i = 0; i < MAX_RETRY; i++) {
             try {
                 Response r = conn.sendAndRetreive(req);

@@ -14,7 +14,7 @@ chiave `"operation"` è obbligatoria; tutti gli altri campi sono **opzionali**
 | `oldUsername`, `oldPsw`, `newUsername`, `newPsw` | String | updateCredentials |
 | `udpPort` | Integer | login (**OBBLIGATORIA**: porta UDP su cui il client ascolta le notifiche di fine partita) |
 | `words` | `List<String>` | submitProposal (4 parole) |
-| `gameId` | Integer | requestGameInfo, requestGameStats (`-1` = corrente) |
+| `roundId` | Integer | requestGameInfo, requestGameStats (`-1` = partita corrente; altrimenti id round dello storico) |
 | `playerName`, `topPlayers` | String, Integer | requestLeaderboard |
 
 ## Note

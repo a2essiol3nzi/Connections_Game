@@ -37,7 +37,7 @@ Operazioni (switch):
   e risponde `BAD_REQUEST`. Ritorna `gameInfo(...)` del giocatore.
 - `logout` → `games.logoutUser`, azzera `loggedInUserId`.
 - `submitProposal` → `handleProposal`.
-- `requestGameInfo` → `gameInfo` (roundId da `req.gameId`, default -1); `null` →
+- `requestGameInfo` → `gameInfo` (roundId da `req.roundId`, default -1); `null` →
   `ERR_NO_ACTIVE_GAME`/`ERR_GAME_NOT_FOUND`.
 - `requestGameStats` → `gameStats`; `null` → `ERR_GAME_NOT_FOUND`.
 - `requestLeaderboard` → `leaderboard`; `null` → `ERR_PLAYER_NOT_FOUND`.

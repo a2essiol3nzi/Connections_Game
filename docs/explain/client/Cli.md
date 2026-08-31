@@ -30,6 +30,10 @@ Helper privati:
 - `section(String title)` — intestazione in cornice colorata (58 colonne).
 - `renderBoard(List<String>)` — parole residue in **griglia colorata** 4 colonne
   (calcola larghezza cella dal testo più lungo, min 6).
+- `printPrompt()` (statico) — disegna il prompt `>> `; **riusato da UdpClient**.
+- `clearInputLine()` (statico) — cancella la riga corrente (`\r` + ANSI clear-line
+  `\u001b[2K`); usato prima di uno stampo asincrono per non lasciare il prompt
+  "sporco".
 
 ## Costanti colore ANSI
 `RESET/BOLD/DIM/CYAN/GREEN/RED/YELLOW` (`\u001b[` + codice). `printHelp()` usa

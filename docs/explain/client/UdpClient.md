@@ -23,14 +23,20 @@ mandato al server nel `login` come `udpPort`.
 (catch Exception). Su `IOException` di receive, se `running` logga e continua.
 
 ## `printResult(roundId)` — retry anti-TOCTOU
+- Prima dello stampo asincrono chiama `Cli.clearInputLine()` (cancella la riga di
+  input corrente, ANSI `\r\u001b[2K`) per non lasciare il prompt sporco/residui.
 - Invia `requestGameInfo` (roundId) via `ClientConn.sendAndRetreive`.
 - `ERR_GAME_NOT_FOUND` ⇒ storico non ancora finalizzato ⇒ `sleep(RETRY_DELAY_MS)`
   e riprova (fino a `MAX_RETRY`).
 - OK ⇒ stampa esito con `Cli.renderGameInfo(GameInfoPayload)` (il payload
-  `Object` viene riconvertito con `GSON.fromJson(GSON.toJson(r.payload), GameInfoPayload.class)`).
+  `Object` viene riconvertito con `GSON.fromJson(GSON.toJson(r.payload), GameInfoPayload.class)`); poi ridisegna il prompt `Cli.printPrompt()`.
 - `ERR_...` ≠ not-found ⇒ esito non disponibile; `IOException` ⇒ abbandona.
 
 `MAX_RETRY=10`, `RETRY_DELAY_MS=200` (~2s coprono la finestra TOCTOU).
+`ponytail:` la cancellazione è ANSI, il buffer canonico di stdin non è svuotabile
+senza una libreria raw (es. JLine) — gestiamo la parte visiva, il testo già
+battuto dall'utente resta nel buffer del terminale. Add JLine quando serva un
+prompt raw-mode completo.
 
 ## Collegamenti
 - `client/ClientConn`: `sendAndRetreive()` per il fetch dell'esito (lock condiviso).

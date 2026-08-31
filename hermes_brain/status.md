@@ -14,7 +14,7 @@
 | S9 | Classifica+stats+storico (`core/GameManager`) | 🟢 | leaderboard (cumulative), game/player stats; **storico persistito** (`historyFile`, cap 10_000); `onlineUsers` auto-join; **`current` `volatile` + `current()` lock-free**; **`submitProposal` NON più `synchronized`** (parallelismo via lock per-`PlayerState`; TOCTOU gestita da `finalized` CAS); `finalizeGame` rilegge `ps` sotto `synchronized(ps)`; `logoutUser` atomico; `finalizeGame` **idempotente**; **`persistHistory` streamed su `ioLock`**; verificato |
 | S10 | Persistenza | 🟢 | **event-driven, NO timer**: `PersistenceThread` rimosso; deltas account → `persistQuiet()` in `register`/`updateCredentials` (perdita crash=0); stats/storico → scheduler post-finalize; shutdown hook all'uscita; `ioLock` su `UserStore`/`GameManager` |
 | S11 | Protocollo errori (`protocol/Errors`) | 🟢 | enum centralizzato; `null`=OK; +`BAD_REQUEST`,`ERR_PLAYER_NOT_FOUND`,`ERR_ALREADY_LOGGED_IN` (login duplicato) |
-| S12 | Envelope (`protocol/Request`/`Response`) | 🟢 | `gameId=-1`⇒corrente; `requestGameInfo` storico espone `assignment`+tema; `Response.err(Errors)` con `message`. **Payload ora POJO** in `protocol/payload/` (per-op) |
+| S12 | Envelope (`protocol/Request`/`Response`) | 🟢 | `roundId=-1`⇒corrente; `requestGameInfo` storico espone `assignment`+tema; `Response.err(Errors)` con `message`. **Payload ora POJO** in `protocol/payload/` (per-op). `Request.roundId` (ex `gameId`) |
 
 ## CLIENT
 | ID | Componente | Stato | Note |

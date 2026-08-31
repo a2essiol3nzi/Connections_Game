@@ -170,14 +170,14 @@ public class ClientHandler implements Runnable {
                 return handleProposal(req.words);
             }
             case "requestGameInfo": {
-                int rid = roundIdOr(req.gameId, -1);
+                int rid = roundIdOr(req.roundId, -1);
                 GameInfoPayload info = ctx.games.gameInfo(loggedInUserId, rid, ctx.users);
                 if (info == null)
                     return Response.err(rid == -1 ? Errors.ERR_NO_ACTIVE_GAME : Errors.ERR_GAME_NOT_FOUND);
                 return Response.ok(info);
             }
             case "requestGameStats": {
-                GameStatsPayload s = ctx.games.gameStats(roundIdOr(req.gameId, -1));
+                GameStatsPayload s = ctx.games.gameStats(roundIdOr(req.roundId, -1));
                 if (s == null) return Response.err(Errors.ERR_GAME_NOT_FOUND);
                 return Response.ok(s);
             }

@@ -8,11 +8,12 @@ anche `startServer()` per avviare il server su config temporanea (porte alte +
 file persist/history in `/tmp`) così i test NON toccano `data/users.json` di
 produzione.
 
-## Wrapper operazioni (9)
+**Wrapper operazioni (9)**
 `register(u,p)`, `updateCredentials(oldU,oldP,newU,newP)`, `login(u,p,udpPort)`,
-`logout()`, `submit(words)`, `gameInfo(gameId)`, `gameStats(gameId)`,
+`logout()`, `submit(words)`, `gameInfo(roundId)`, `gameStats(roundId)`,
 `leaderboard(playerName, topN)`, `playerStats()`. Tutti costruiscono `Request`
-e chiamano `conn.sendAndRetreive`.
+e chiamano `conn.sendAndRetreive`. `gameInfo`/`gameStats` impostano `r.roundId`
+(`-1` = partita corrente).
 
 ## Riconversione payload → POJO
 `asGameInfo`, `asStats`, `asLb`, `asPlayer`, `asSubmit` (→

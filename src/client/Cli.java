@@ -233,13 +233,13 @@ public class Cli {
 
     private void cmdGameInfo(String[] t) {
         Request r = req("requestGameInfo");
-        r.gameId = parseId(t, 1); 
+        r.roundId = parseId(t, 1); 
         sendAndRender(r);
     }
 
     private void cmdGameStats(String[] t) {
         Request r = req("requestGameStats");
-        r.gameId = parseId(t, 1); 
+        r.roundId = parseId(t, 1); 
         sendAndRender(r);
     }
 
@@ -265,6 +265,14 @@ public class Cli {
     // Stampa il prompt di input. Usato anche da UdpClient.
     static void printPrompt() {
         System.out.print(CYAN + BOLD + ">> " + RESET);
+        System.out.flush();
+    }
+
+    // Cancella la riga corrente.
+    // Prima di una stampa ASINCRONA (es. notifica UDP) per non lasciare il
+    // prompt "sporco" con residui dell'input utente in corso.
+    static void clearInputLine() {
+        System.out.print("\r\u001b[2K");
         System.out.flush();
     }
 
