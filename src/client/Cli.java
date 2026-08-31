@@ -245,8 +245,21 @@ public class Cli {
 
     private void cmdLeaders(String[] t) {
         Request r = req("requestLeaderboard");
-        if (t.length > 1 && "-k".equals(t[1]) && t.length > 2) r.topPlayers = Integer.parseInt(t[2]);
-        else if (t.length > 1 && "-name".equals(t[1]) && t.length > 2) r.playerName = t[2];
+        if (t.length > 1 && "-k".equals(t[1])) {
+            if (t.length < 3) {
+                System.out.println("uso: leaders -k <N> (N numerico)");
+                return;
+            }
+            try {
+                r.topPlayers = Integer.parseInt(t[2]);
+            } catch (NumberFormatException e) {
+                // input non numerico -> non crashare, mostra uso
+                System.out.println("uso: leaders -k <N> (N numerico)");
+                return;
+            }
+        } else if (t.length > 1 && "-name".equals(t[1])) {
+            if (t.length > 2) r.playerName = t[2];
+        }
         // default: entrambi assenti -> classifica completa (topPlayers null)
         sendAndRender(r);
     }
