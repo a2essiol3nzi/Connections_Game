@@ -57,7 +57,7 @@ Caricamento pigro via `GameLoader` (`JsonReader`+`skipValue`, O(1)).
 ## Storico partite (persistito, novità)
 `GameManager.history` chiave = `roundId` (monotono); `GameHistory = {roundId, sourceGameId,
 GameData.Group[4] (tema+parole), entries: Map<userId, {correct,errors,score,outcome}>}`.
-Persistito in `data/history.json` (atomico, cap 10_000 round). `requestGameInfo(roundId!=-1)`
+Persistito in `data/history.json` (atomico, **senza limite**: cresce indefinitamente, nessun trim). `requestGameInfo(roundId!=-1)`
 lo espone includendo il `theme` (a fine partita è lecito). `finalizeGame` è **idempotente**
 (`compareAndSet` su `finalized`): chiamato da scheduler + shutdown hook + timer, conta 1 sola volta.
 

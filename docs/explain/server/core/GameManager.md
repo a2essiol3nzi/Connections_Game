@@ -12,14 +12,15 @@ storico PERSISTITO** e aggiorna le statistiche (`UserStore`).
   lettura; assegnato SOLO in `rotate()` (synchronized) e nel costruttore, sempre
   costruito PRIMA della pubblicazione → nessun oggetto "semivisto".
 - `history` — `ConcurrentHashMap<Integer,GameHistory>` partite CONCLUSE, chiave =
-  **`roundId`**.
+  **`roundId`**, **TENUTA IN RAM** per servire richieste storiche arbitrarie.
   - `GameHistory { roundId, sourceGameId, GameData.Group[4] (tema+parole),
     Map<Integer,HistoryEntry> entries }` — `entries` chiave = **userId immutabile**.
   - `HistoryEntry { correct, errors, score, outcome }`.
 - `onlineUsers` — `Set<Integer>` (ConcurrentHashMap-backed) per auto-join.
 - `nextRoundId` — `AtomicInteger` monotono (non si ripete al wrap).
-- `HISTORY_CAP = 10_000` (trim del `roundId` più basso).
-- `historyFile` + `ioLock` (monitor dedicato per I/O su disco).
+- `historyFile` + `ioLock` (monitor dedicato per I/O su disco). **Storico senza
+  limite**: nessuna cap/trim (richiesta di progetto); cresce indefinitamente via
+  `history.put` in `finalizeGame`.
 
 ## Operazioni (identificazione per **userId** immutabile)
 - `current()` — lettura **lock-free** (campo `volatile`). Sbloccata la path di
@@ -75,9 +76,19 @@ read-only). Solo `synchronized`/`volatile`/`Atomic*`/`ConcurrentHashMap`
 ## Persistenza storico (scelta didattica)
 Storico intero riscritto su file JSON atomico (tmp + `ATOMIC_MOVE`). In
 produzione si userebbe un DB append-only/WAL; qui il vincolo del progetto è
-"persistenza su file JSON" e lo storico è bounded (10k, ~MB) e cambia UNA volta
-per partita → riscrittura integrale adeguata (niente early-optimization). Gson
-streamed verso il writer: O(1) di memoria extra.
+"persistenza su file JSON" e lo storico cresce SENZA limite (nessun trim) — il
+file si allarga di un round (~KB) a ogni partita → riscrittura integrale adeguata
+per questo scope (niente early-optimization). Gson streamed verso il writer:
+O(1) di memoria extra.
+
+**Tradeoff RAM / boot (implicito nel requisito "senza limite")**: lo storico è
+**tenuto interamente in RAM** (`history` CHM) per servire richieste arbitrarie;
+costa poche centinaia di KB/giorno (~160 round a 600s/partita) → irrilevante per
+una JVM, ma il costo reale crescente è (a) il **file** e (b) il **boot** —
+`loadHistory` deserializza tutto in RAM all'avvio. Entrambi accettati per scope
+didattico; con storico illimitato in produzione si userebbe un DB (WAL/append) e
+un indice lazy per-round, che eviterebbero RAM + rewrite-integrali (vedi commenti
+in `GameManager.java` su `history` e `loadHistory`).
 
 ## Collegamenti
 - `protocol/payload/*`: tipi di ritorno (`GameInfoPayload`, `GameStatsPayload`,

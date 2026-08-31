@@ -58,7 +58,7 @@ Gioco "Connections" (NYT) implementato in **Java** con architettura **client-ser
 5. Libreria JSON → **Gson** (jar allegato).
 6. Codici errore → **testuali** centralizzati in `protocol/Errors` (enum).
 7. Sentinel "partita corrente" → `roundId = -1` (INT). `gameId` sorgente si ripete; `roundId` monotono.
-8. Persistenza → **utenti + storico partite** (JSON separati), **event-driven senza timer** (deltas account in `register`/`updateCredentials`; stats/storico nel scheduler post-finalize; shutdown hook all'uscita).
+8. Persistenza → **utenti + storico partite** (JSON separati), **event-driven senza timer** (deltas account in `register`/`updateCredentials`; stats/storico nel scheduler post-finalize; shutdown hook all'uscita). **Storico SENZA limite/trim** (richiesta progetto): tenuto in RAM + file + boot crescono senza cap; RAM irrilevante (KB/giorno), il costo reale è file/boot, tradeoff accettato per scope didattico (in produzione: DB WAL).
 9. Outcome per giocatore ∈ {WON, LOST(4 errori), NOT_FINISHED(timeout)}.
 10. Mistake Histogram: bin vittorie 0-3 errori + fallite(4) + not_finished.
 11. Notifiche UDP → **unicast** a endpoint registrati (`UdpRegistry`: IP TCP + port dal login).

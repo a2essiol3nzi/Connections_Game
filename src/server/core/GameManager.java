@@ -57,7 +57,6 @@ import java.util.Random;
 public class GameManager {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final int HISTORY_CAP = 10_000;
 
     private final GameLoader loader; // sorgente partite PIGRO
     private final int durationSec; // durata partita (da config)
@@ -68,6 +67,13 @@ public class GameManager {
     // volatile + costruita PRIMA dell'assegnazione -> visibilità corretta senza lock in lettura.
     private volatile ActiveGame current;
     // Storico partite CONCLUSE: roundId -> (groups con tema + userId -> esito/score).
+    // Senza limite (richiesta di progetto): cresce un round (~KB/history a 600s/partita,
+    // ~160 round/giorno => ~KB-GB giornaliere) e l'intera mappa e' TENUTA IN RAM per
+    // servire richieste storiche arbitrarie. Il costo in RAM è proporzionale a giorni di
+    // runtime: poche centinaia di KB al giorno, irrilevante per una JVM (heap default già
+    // ≥256MB); il vero costo crescente è il file e il BOOT (loadHistory deserializza tutto).
+    // TRADEOFF accettato per scope didattico: persist su JSON senza DB. In produzione con
+    // storico illimitato si userebbe un DB (WAL/append) che evita RAM+rewrite-integrali.
     private final Map<Integer, GameHistory> history = new ConcurrentHashMap<>();
     // Utenti attualmente loggati (per auto-join).
     private final Set<Integer> onlineUsers = ConcurrentHashMap.newKeySet();
@@ -445,27 +451,19 @@ public class GameManager {
             }
         }
         history.put(h.roundId, h);
-        if (history.size() > HISTORY_CAP) {
-            trimHistory();
-        }
     }
 
-    // Tiene lo storico bounded rimuovendo il roundId più basso.
-    // Per implementazioni reali avremmo usato un DB (ora solo per scopi didattici).
-    private void trimHistory() {
-        int min = Integer.MAX_VALUE;
-        for (int k : history.keySet()) 
-            min = Math.min(min, k);
-        history.remove(min);
-    }
+    // Lo storico cresce INDEFINITAMENTE: nessun trim.
+    // Nota: persistHistory() riscrive l'INTERO file JSON a ogni partita; col
+    // tempo il file cresce senza limite (scelta consapevole per questo scope
+    // didattico: in produzione si userebbe un DB append-only/WAL).
 
     /**
      * PERSISTENZA STORICO
      * Scelta consapevole per questo progetto didattico: storico intero riscritto su file
-     * JSON atomico. In produzione aziendale si userebbe un DB (append-only/WAL) che evita
-     * di riscrivere tutto a ogni salvataggio; QUI il vincolo del progetto è "persistenza su
-     * file JSON" e lo storico è bounded (HISTORY_CAP=10k, ~MB) e cambia una volta per partita,
-     * quindi la riscrittura integrale è adeguata e accettabile (niente early-optimization).
+     * JSON atomico. In produzione aziendale potremmo usare un DB (append-only/WAL) che evita
+     * di riscrivere tutto a ogni salvataggio; QUI il file si allarga di un round (~KB) a 
+     * ogni partita: riscrittura integrale adeguata e accettabile per questo scopo (niente early-optimization).
      * Gson serializza STREAMED verso il writer (toJson(map, w)): niente String/JsonElement
      * intermedia dell'intero storico in RAM = memoria extra O(1). history.put avviene SOLO in
      * finalizeGame (synchronized), chiamato dal solo scheduler => unico scrittore, nessun lock
@@ -486,6 +484,13 @@ public class GameManager {
         }
     }
 
+    /**
+     * Deserializza l'INTERO storico in RAM all'avvio (single-thread). Con storico
+     * senza limite il tempo/memoria di boot crescono col file accumulato. TRADEOFF
+     * accettato: servire una richiesta storico arbitraria richiede la mappa in RAM.
+     * (Alternativa lazy: indicizzare per-round su disco e load su richiesta - non
+     * fatta, early-optimization a questa scala)
+     */
     private void loadHistory() {
         Path p = Paths.get(historyFile);
         if (!Files.exists(p)) 
