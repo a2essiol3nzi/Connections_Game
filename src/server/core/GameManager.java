@@ -27,6 +27,7 @@ import java.nio.file.StandardCopyOption;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -259,20 +260,23 @@ public class GameManager {
         if (g != null) {
             int inProgress = 0, finished = 0, won = 0;
             Set<Integer> parts = g.participants();
-            for (int u : parts) {
+            // Partecipanti "presenti" = chi è ANCORA online.
+            Set<Integer> present = new HashSet<>(parts);
+            present.retainAll(onlineUsers);
+            for (int u : present) {
                 PlayerState ps = g.getState(u);
                 if (ps == null)
                     continue;
                 synchronized (ps) {
-                    if (ps.finished) { 
-                        finished++; 
-                        if (ps.correctCount >= 3) 
-                            won++; 
+                    if (ps.finished) {
+                        finished++;
+                        if (ps.correctCount >= 3)
+                            won++;
                     }
                     else inProgress++;
                 }
             }
-            p.participantsTotal = parts.size();
+            p.participantsTotal = present.size();
             p.inProgress = inProgress;
             p.finished = finished;
             p.won = won;

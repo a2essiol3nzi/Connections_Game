@@ -76,7 +76,8 @@ render dispatch sceglie la classe giusta in base all'operazione
   stats concatena i campi **senza spazi iniziali** e usa `replaceAll(" +$","")`
   (non `.trim()`) per non rompere l'ESC.
 - `renderGameStats(GameStatsPayload)` → sezione `STATISTICHE PARTITA`:
-  partecipanti/in corso/media/finiti colorati (con `remainingSec` live).
+  partecipanti (**con "(connessi)"**, è il conteggio live = solo chi è online)/
+  in corso/media/finiti colorati (con `remainingSec` live).
 - `renderLeaderboard(LeaderboardPayload)` → sezione `CLASSIFICA`: i primi 3
   ranghi in `YELLOW BOLD`.
 - `renderPlayerStats(PlayerStatsPayload)` → sezione `STATISTICHE PERSONALI`:

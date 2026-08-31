@@ -40,6 +40,10 @@ storico PERSISTITO** e aggiorna le statistiche (`UserStore`).
   `roundId==-1` (default) **o round corrente** ⇒ live; altro round ⇒ storico.
   `null` su errore (handler → `ERR_NO_ACTIVE_GAME`/`ERR_GAME_NOT_FOUND`).
 - `gameStats(roundId)` → **`GameStatsPayload`** — live o da `history` (media).
+  **Live**: `participantsTotal` conta SOLO i giocatori **ancora online** (connessi) e
+  nella partita (`onlineUsers ∩ players`); chi si disconnette non conta più, pur
+  restando in `players` (non va ripulita: `finalizeGame` la itera per storico +
+  stats cumulative). `inProgress`/`finished`/`won` tra i presenti.
 - `leaderboard(playerName, topK, store)` → **`LeaderboardPayload`** — snapshot
   `(id,score)` con lock granulare per utente, sort+rank DOPO; weak consistency
   accettata (read-only). `null` ⇒ `ERR_PLAYER_NOT_FOUND`.

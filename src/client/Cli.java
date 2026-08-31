@@ -377,7 +377,7 @@ public class Cli {
         section("STATISTICHE PARTITA");
         if (o.remainingSec != null)
             System.out.println("  tempo rimanente: " + YELLOW + o.remainingSec + "s" + RESET);
-        System.out.println("  partecipanti: " + CYAN + o.participantsTotal + RESET);
+        System.out.println("  partecipanti: " + CYAN + o.participantsTotal + RESET + DIM + " (connessi)" + RESET);
         if (o.inProgress != null)
             System.out.println("  in corso:     " + YELLOW + o.inProgress + RESET);
         if (o.avgScore != null)
