@@ -23,6 +23,14 @@ storico PERSISTITO** e aggiorna le statistiche (`UserStore`).
   `history.put` in `finalizeGame`.
 
 ## Operazioni (identificazione per **userId** immutabile)
+- Costruttore — dopo `loadHistory()` chiama **`resumeFromRound()`** (vedi sotto),
+  poi `makeNext()` crea la partita corrente.
+- `resumeFromRound()` (privato, solo al boot) — **anti-furto ordine**: la sequenza
+  del ciclo è deterministica (`0..total-1` poi wrap), 1 partita per round. Al
+  riavvio riallinea l'iteratore al punto lasciato: `skip = (nextRoundId-1) % total`
+  (= `roundId % total`, dove `roundId` = round già giocati da `loadHistory`),
+  avanzando e scartando quelle partite. Così si riparte dalla partita successiva
+  all'ultima mostrata prima dello shutdown, non dalla prima del file.
 - `current()` — lettura **lock-free** (campo `volatile`). Sbloccata la path di
   lettura (`gameInfo`/`gameStats`/`join`/`submitProposal`).
 - `rotate(nowMs)` — `synchronized`: `current = makeNext()` + auto-join di tutti

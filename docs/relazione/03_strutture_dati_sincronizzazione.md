@@ -17,7 +17,7 @@ La base di gran parte dello stato condiviso lato server è `ConcurrentHashMap`.
 
 ### Contatori atomici
 
-- `AtomicInteger`: `UserStore.nextId` genera id utente monotoni; `GameManager.nextRoundId` assegna a ogni partita un `roundId` univoco (che non si ripete al ciclo del loader).
+- `AtomicInteger`: `UserStore.nextId` genera id utente monotoni; `GameManager.nextRoundId` assegna a ogni partita un `roundId` univoco (che non si ripete al ciclo del loader). Al riavvio `loadHistory()` ricostruisce `nextRoundId` dal massimo roundId dello storico, e `resumeFromRound()` usa quel conteggio per riallineare il ciclo delle partite al punto esatto di interruzione (vedi cap. 1, "Ordinamento delle partite").
 - `AtomicBoolean`: `ActiveGame.finalized` segnala la conclusione della partita. Lettura senza lock (volatile) nelle validazioni; scrittura unica atomica via `compareAndSet(false, true)` in `finalizeGame` per rendere la finalizzazione **idempotente** (solo la prima procede).
 - `volatile`: `GameManager.current` (la partita attiva) è `volatile`; è costruita *prima* dell'assegnazione, quindi le letture senza lock vedono uno stato coerente.
 

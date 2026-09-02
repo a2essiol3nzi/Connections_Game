@@ -100,7 +100,24 @@ public class GameManager {
         this.historyFile = historyFile;
         this.games = loader.cyclicIterator();
         loadHistory();
+        resumeFromRound();  // riallinea il ciclo al punto in cui eravamo (anti-furto ordine)
         this.current = makeNext(System.currentTimeMillis());
+    }
+
+    /* Al riavvio riparte dalla partita in cui eravamo: la sequenza del ciclo è
+     * deterministica (0..total-1, poi wrap), e a ogni round si consuma UNA partita.
+     * Dato il contatore roundId la posizione corrente nel ciclo è `roundId % total`. 
+     * Avanza di quegli step e scarta, così `makeNext()` (subito dopo) produce la 
+     * partita che segue l'ultima mostrata prima dello shutdown. 
+     */
+    private void resumeFromRound() {
+        if (loader.total() <= 0)
+            return;
+        int played = nextRoundId.get() - 1;
+        int skip = played % loader.total();
+        for (int i = 0; i < skip; i++) {
+            games.next();
+        }
     }
 
     /* Costruisce la prossima partita: delega al loader pigro.
