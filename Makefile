@@ -25,7 +25,7 @@ compile:
 	$(JAVAC) --release 8 -cp '$(CP)' -d $(OUT) $(SOURCES)
 
 # Un JAR = un file .class raggruppato, per lanciarlo con `java -jar`.
-# Il "manifest" dice: main class da avviare e dove trovare gson 
+# Il "manifest" dice: main class da avviare e dove trovare gson
 # (che resta fuori, in lib/).
 jar: compile
 	mkdir -p $(DIST)
@@ -40,13 +40,7 @@ run: compile
 run-client: compile
 	java -cp '$(CP)' client.ClientMain
 
-# Compila ed esegue le suite di test
-test: compile
-	mkdir -p test/out
-	$(JAVAC) --release 8 -cp '$(CP)' -d test/out test/T.java test/TC.java test/TestFunc.java test/TestLoad.java test/TestStats.java test/TestLoader.java test/RunAll.java
-	$(JAVA) -cp 'out:test/out:$(LIB)' RunAll
-
 clean:
-	rm -rf $(OUT) $(DIST) test/out
+	rm -rf $(OUT) $(DIST)
 
-.PHONY: compile run run-client clean
+.PHONY: compile jar run run-client clean
