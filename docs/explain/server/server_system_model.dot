@@ -12,49 +12,61 @@ digraph Server {
     label="THREAD 1 · main (1)"; fontsize=13; fontcolor="#7b4a0e"; style="rounded,filled";
     fillcolor="#fdf6e3"; color="#d68910";
     Main   [label="ServerMain\n(main()) wiring", fillcolor="#ffffff", color="#d68910", fontcolor="#7b4a0e"];
-    Accept [label="ConnectionAcceptor\naccept() loop", fillcolor="#ffffff", color="#d68910", fontcolor="#111827"];
-    Main -> Accept [label="avvia (stesso thread)", style=dashed, color="#999999"];
+    Accept [label="ConnectionAcceptor\naccept() loop\n→ pool.submit(ClientHandler)", fillcolor="#ffffff", color="#d68910", fontcolor="#111827"];
+    Main -> Accept [label="run() (stesso thread)", style=dashed, color="#999999"];
   }
 
-  // ===== THREAD 2 · scheduler (persistenza event-driven VIA QUESTO THREAD) =====
+  // ===== THREAD 2 · scheduler =====
   subgraph cluster_sched {
     label="THREAD 2 · scheduler (1)"; fontsize=13; fontcolor="#92400e"; style="rounded,filled";
     fillcolor="#fdf6e3"; color="#d97706";
-    Sched [label="GameScheduler\nsleep → finalizeGame → persist\n→ UDP notifyEnd → rotate", fillcolor="#ffffff", color="#d97706", fontcolor="#111827"];
+    Sched [label="GameScheduler\nsleep → finalizeGame → persist\n→ notifier.notifyEnd → rotate", fillcolor="#ffffff", color="#d97706", fontcolor="#111827"];
   }
 
-  // ===== THREAD POOL: N ClientHandler (separato da main/sched) =====
+  // ===== THREAD 3 · shutdown hook =====
+  subgraph cluster_hook {
+    label="THREAD 3 · shutdown hook (1)"; fontsize=13; fontcolor="#92400e"; style="rounded,filled";
+    fillcolor="#fdf6e3"; color="#d97706";
+    Hook [label="ShutdownHook (JVM)\nSIGTERM/SIGINT\nusers.persist() + persistHistory()", fillcolor="#ffffff", color="#d97706", fontcolor="#111827"];
+  }
+
+  // ===== THREAD POOL: N ClientHandler =====
   subgraph cluster_pool {
     label="THREAD POOL · N ClientHandler (N)"; fontsize=13; fontcolor="#075985"; style="rounded,filled";
     fillcolor="#e0f2fe"; color="#0284c7";
-    Pool [label="ThreadPool\nN × ClientHandler\n1 socket / handler\n(gestisce login/submit/richieste)", fillcolor="#ffffff", color="#0284c7", fontcolor="#075985"];
-    Main -> Pool [label="submit() nuove connessioni"];
+    Pool [label="ThreadPool (fixed)\nN × ClientHandler\n1 connessione persistente / handler\n(gestisce tutte le operazioni)", fillcolor="#ffffff", color="#0284c7", fontcolor="#111827"];
   }
 
-  // ===== OGGETTO CONDIVISO (stato) =====
+  // ===== OGGETTO CONDIVISO (stato) + notifier =====
   subgraph cluster_shared {
     label="OGGETTO CONDIVISO tra i thread (lock)"; fontsize=12; fontcolor="#166534";
     style="rounded,filled,dashed"; fillcolor="#f0fdf4"; color="#16a34a";
-    GM     [label="GameManager\ncurrent (volatile) · history (CHM) · onlineUsers\nnextRoundId (Atomic) · finalize idempotente\nsubmit lock-free · login/rotate sync", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
-    Store  [label="UserStore\nbyId · nameToId (CHM)\npersist event-driven: snapshot sotto this\n+ I/O su ioLock (NO timer)", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
-    Active [label="ActiveGame\nplayers (CHM) · finalized\nsubmit lock su PlayerState", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
-    Loader [label="GameLoader\nGson stream O(1)\nCyclicIterator", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
+    GM     [label="GameManager\ncurrent (volatile) · history (CHM) · onlineUsers\nnextRoundId (Atomic) · finalize idempotente\nsubmit lock-free · rotate sync", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
+    Store  [label="UserStore\nbyId · nameToId (CHM)\npersist event-driven su ioLock (No timer)", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
     Reg    [label="UdpRegistry\nuserId → addr:port (CHM)", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
-    GM -> Store  [label="stats update"];
-    GM -> Active [label="rotate / esiti"];
-    GM -> Loader [label="games.next()"];
-    GM -> Reg    [label="logoutUser"];
+    Notif  [label="UdpNotifier\n(un socket per notifyEnd, poi close)", fillcolor="#ffffff", color="#16a34a", fontcolor="#111827"];
+    GM -> Store [label="stats update"];
+    GM -> Reg   [label="logoutUser (pulisce)"];
   }
 
-  // ===== archi verso lo stato condiviso (lock) =====
-  Accept -> GM   [label="ClientHandler per-conn"];
-  Pool   -> GM    [label="register/login · submit/join"];
-  Pool   -> Store [label="getState"];
-  Pool   -> Active [label="submit/join"];
+  // ===== archi: main / pool (Connessioni) =====
+  Accept -> Pool [label="pool.submit()"];
+  Pool   -> GM    [label="reg.log / login / logout\nsubmitProposal / info / stats\nleaderboard / playerStats"];
+  Pool   -> Store [label="register / login\nupdateCredentials / getById"];
+  Pool   -> Reg   [label="register(body) endpoint"];
 
+  // ===== archi: scheduler / hook (ciclo di vita + persistenza) =====
   Sched  -> GM    [label="finalizeGame / rotate"];
-  Sched  -> Store [label="users.persist()", constraint=false];
-  Sched  -> Reg   [label="notifyEnd (segnale)"]; // scheduler legge endpoint dal UdpRegistry
+  Sched  -> Store [label="persist() (stats post-finalize)"];
+  Sched  -> Notif [label="notifyEnd(...)"];
+  Hook   -> Store [label="persist()"];
+  Hook   -> GM    [label="persistHistory()"];
 
-  Main   -> Sched [style=dotted] // avvio
+  // ===== notifier: usa registry =====
+  Notif -> Reg [label="getEndpoint()"];
+
+  // ===== avvio thread =====
+  Main -> Sched [style=dotted, label="start"];
+  Main -> Hook  [style=dotted, label="addShutdownHook"];
+  Main -> Pool  [style=dotted, label="newFixedThreadPool", constraint=false];
 }
