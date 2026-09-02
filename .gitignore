@@ -1,5 +1,5 @@
 # dir con file eseguibili
-*out/*
+out/
 dist/*
 
 # dir di config IDE

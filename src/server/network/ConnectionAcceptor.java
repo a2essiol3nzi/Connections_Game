@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Accetta connessioni TCP e le smista a thread del pool.
@@ -28,7 +29,18 @@ public class ConnectionAcceptor implements Runnable {
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             while (true) {
                 Socket client = serverSocket.accept();
-                pool.submit(new ClientHandler(client, ctx));
+                try {
+                    pool.submit(new ClientHandler(client, ctx));
+                } catch (RejectedExecutionException e) {
+                    // Pool saturo (tutti i worker occupati): RIFIUTA la connessione. Il socket
+                    // non è stato preso in carico da alcun worker: chiudendolo il client viene
+                    // disconnesso (e può decidere di ritentare) invece di accumularsi in coda.
+                    System.err.println("[Acceptor] pool saturo, rifiuto " + client.getInetAddress());
+                    try {
+                        client.close();
+                    } catch (IOException ignored) {
+                    }
+                }
             }
         } catch (IOException e) {
             // L'acceptor è l'unico loop di vita del server: se la ServerSocket

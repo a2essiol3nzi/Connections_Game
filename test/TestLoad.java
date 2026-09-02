@@ -20,7 +20,9 @@ public class TestLoad {
     public static int run(int port) throws Exception {
         int fails = 0;
         final int TS = (int) (System.nanoTime() % 100000);
-        final int nUsers = 20;
+        // client concorrenti limitato al pool del test (TC.startServer: pool.size=16):
+        // con la politica di rifiuto "AbortPolicy" chi supera il tetto viene disconnesso.
+        final int nUsers = 16;
 
         // ==== L1. login concorrenti ====
         T.section("L1. login concorrenti (" + nUsers + " utenti)");
@@ -92,7 +94,7 @@ public class TestLoad {
 
         // ==== L4. leaderboard concorrenti ====
         T.section("L4. leaderboard concorrenti (read-heavy)");
-        final int nRd = 20;
+        final int nRd = 16;
         AtomicInteger l4err = new AtomicInteger();
         List<Thread> lt = new ArrayList<>();
         long lb0 = System.nanoTime();

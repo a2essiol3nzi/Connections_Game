@@ -5,8 +5,9 @@ import server.network.ConnectionAcceptor;
 import server.network.GameScheduler;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Entry point del server.
@@ -63,7 +64,17 @@ public class ServerMain {
         }));
 
         // 6) acceptor TCP sul thread principale
-        ExecutorService pool = Executors.newFixedThreadPool(cfg.poolSize);
+        // Pool a crescita on-demand: core 0 (nessun thread in attesa se non ci sono client),
+        // massimo pool.size, thread idle muoiono dopo 10s. SynchronousQueue consegna ogni
+        // task direttamente a un worker (con core 0 una coda unbounded non spawnerebbe mai
+        // thread); in saturazione (tutti i worker occupati) la AbortPolicy RIFIUTA il task
+        // lanciando RejectedExecutionException: l'acceptor chiude la connessione del client
+        // (che si disconnette) invece di accumulare richieste o bloccare.
+        ThreadPoolExecutor pool = new ThreadPoolExecutor(
+                0, cfg.poolSize,
+                10, TimeUnit.SECONDS,
+                new SynchronousQueue<>(),
+                new ThreadPoolExecutor.AbortPolicy());
         ConnectionAcceptor acceptor = new ConnectionAcceptor(cfg.tcpPort, pool, ctx);
         System.out.println("[Server] listening on TCP " + cfg.tcpPort + " (UDP " + cfg.udpPort + ")");
         acceptor.run();

@@ -22,15 +22,15 @@ Per ogni partita a cui partecipa un giocatore ottiene il seguente punteggio:
 
 Se ad esempio un giocatore invia una proposta sbagliata, poi una proposta corretta, poi un'altra proposta sbagliata e poi il tempo scade e la partita finisce il punteggio per quel giocatore per quella partita sarà -2. Se invece un giocatore vince la partita (inviando 3 proposte corrette) ma fa anche 3 errori (inviando 3 proposte sbagliate) otterrà un punteggio di +6. In Fig.1-3 è mostrata una partita in diversi stadi di gioco.
 
-![Fig. 1](imgs/fig1.png)
+![Fig. 1](images/fig1.png)
 
 **Fig. 1** Connections: uno scenario di gioco in cui il giocatore si è appena unito ad una partita. Al momento il giocatore ha accumulato 0 punti.
 
-![Fig. 2](imgs/fig2.png)
+![Fig. 2](images/fig2.png)
 
 **Fig. 2** Connections: uno scenario di gioco in cui il giocatore ha inviato due proposte corrette e due sbagliate (indicate dai punti rossi in basso). Al momento il giocatore ha accumulato 4 punti.
 
-![Fig. 3](imgs/fig3.png)
+![Fig. 3](images/fig3.png)
 
 **Fig. 3** Connections: uno scenario di gioco in cui il giocatore ha vinto la partita inviando tre proposte corrette e tre sbagliate (indicate dai punti rossi in basso). Con questa partita il giocatore ha accumulato 6 punti.
 

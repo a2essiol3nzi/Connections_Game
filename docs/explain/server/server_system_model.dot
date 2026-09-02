@@ -30,11 +30,11 @@ digraph Server {
     Hook [label="ShutdownHook (JVM)\nSIGTERM/SIGINT\nusers.persist() + persistHistory()", fillcolor="#ffffff", color="#d97706", fontcolor="#111827"];
   }
 
-  // ===== THREAD POOL: N ClientHandler =====
+  // ===== THREAD POOL: N ClientHandler (on-demand) =====
   subgraph cluster_pool {
-    label="THREAD POOL · N ClientHandler (N)"; fontsize=13; fontcolor="#075985"; style="rounded,filled";
+    label="THREAD POOL · 0..N ClientHandler"; fontsize=13; fontcolor="#075985"; style="rounded,filled";
     fillcolor="#e0f2fe"; color="#0284c7";
-    Pool [label="ThreadPool (fixed)\nN × ClientHandler\n1 connessione persistente / handler\n(gestisce tutte le operazioni)", fillcolor="#ffffff", color="#0284c7", fontcolor="#111827"];
+    Pool [label="ThreadPool (on-demand)\ncore 0 → max N · keep-alive 10s\nSynchronousQueue · AbortPolicy\n(rifiuta se saturo)\n1 connessione persistente / handler\n(gestisce tutte le operazioni)", fillcolor="#ffffff", color="#0284c7", fontcolor="#111827"];
   }
 
   // ===== OGGETTO CONDIVISO (stato) + notifier =====
@@ -68,5 +68,5 @@ digraph Server {
   // ===== avvio thread =====
   Main -> Sched [style=dotted, label="start"];
   Main -> Hook  [style=dotted, label="addShutdownHook"];
-  Main -> Pool  [style=dotted, label="newFixedThreadPool", constraint=false];
+  Main -> Pool  [style=dotted, label="newThreadPoolExecutor", constraint=false];
 }

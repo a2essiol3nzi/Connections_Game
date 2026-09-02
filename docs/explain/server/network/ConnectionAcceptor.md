@@ -7,13 +7,17 @@ line-based JSON).
 
 ## Campi
 - `port` — porta di listen (da `ServerConfig.tcpPort`).
-- `pool` — `ExecutorService` (da `ServerMain`, `cfg.poolSize`).
+- `pool` — `ThreadPoolExecutor` (da `ServerMain`, `cfg.poolSize`).
 - `ctx` — `Context` condiviso (incluso `udpRegistry`).
 
 ## Metodo principale
 - `run()` — apre `ServerSocket(port)`, ciclo `accept()` infinito; ad ogni `Socket`
-  client fa `pool.submit(new ClientHandler(client, ctx))`. Su `IOException`
-  stampa e termina.
+  client fa `pool.submit(new ClientHandler(client, ctx))`.
+  - **Saturazione**: se il pool è al massimo (`AbortPolicy`), `submit` lancia
+    `RejectedExecutionException`; l'acceptor la intercetta, logga
+    `[Acceptor] pool saturo, rifiuto <IP>` e **chiude il socket** → il client
+    viene disconnesso (non accumula task in coda, può ritentare).
+  - Su `IOException` stampa e termina il processo.
 
 ## Concorrenza
 Il ciclo `accept` gira sul **thread principale** (`ServerMain`). Ogni connessione
