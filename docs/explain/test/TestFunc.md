@@ -16,8 +16,9 @@ reali da `data/games.json`.
 ## `run(port)` — blocchi di test (9 sezioni)
 1. **register** — nuovo utente, `ERR_USERNAME_TAKEN`, senza psw, `register` da
    loggato → `ERR_ALREADY_LOGGED_IN`.
-2. **login/logout** — senza `udpPort` → `BAD_REQUEST`; psw errata /
-   inesistente / doppio login / logout non loggato.
+2. **login/logout** — senza `udpPort` → `BAD_REQUEST`; psw errata e utente
+   inesistente → stesso `ERR_INVALID_CREDENTIALS` (anti-enumerazione); doppio
+   login / logout non loggato.
 3. **gate auth** — le 5 operazioni protette senza login → `ERR_NOT_LOGGED_IN`.
 4. **submit (MALFORMATA vs ERRATA)** — gruppo errato → `WRONG` (-4);
    parola fuori board → `ERR_MALFORMED` (invariato); duplicati →
@@ -28,7 +29,7 @@ reali da `data/games.json`.
    `ERR_PLAYER_NOT_FOUND`.
 7. **playerStats** — `puzzlesCompleted>=0`, `mistakeHistogram` lungo 6.
 8. **updateCredentials** — rinomina (la sessione NON si sloga), cambio psw,
-   login con vecchia psw ora errata.
+   login con vecchia psw ora errata → `ERR_INVALID_CREDENTIALS`.
 9. **input ostili** — operation vuota/sconosciuta → `UNKNOWN_OPERATION`,
    operation mancante → `BAD_REQUEST`.
 

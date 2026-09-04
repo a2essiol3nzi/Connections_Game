@@ -40,7 +40,8 @@ Operazioni (switch):
 - `requestGameInfo` → `gameInfo` (roundId da `req.roundId`, default -1); `null` →
   `ERR_NO_ACTIVE_GAME`/`ERR_GAME_NOT_FOUND`.
 - `requestGameStats` → `gameStats`; `null` → `ERR_GAME_NOT_FOUND`.
-- `requestLeaderboard` → `leaderboard`; `null` → `ERR_PLAYER_NOT_FOUND`.
+- `requestLeaderboard` → `leaderboard` passando anche `loggedInUserId`: il payload
+  marca la riga del richiedente con `requester=true`; `null` → `ERR_PLAYER_NOT_FOUND`.
 - `requestPlayerStats` → `playerStats`; `null` → `ERR_USER_NOT_FOUND`.
 - default → `UNKNOWN_OPERATION`.
 

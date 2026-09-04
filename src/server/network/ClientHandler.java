@@ -182,7 +182,7 @@ public class ClientHandler implements Runnable {
                 return Response.ok(s);
             }
             case "requestLeaderboard": {
-                LeaderboardPayload lb = ctx.games.leaderboard(req.playerName, req.topPlayers, ctx.users);
+                LeaderboardPayload lb = ctx.games.leaderboard(req.playerName, req.topPlayers, loggedInUserId, ctx.users);
                 if (lb == null) return Response.err(Errors.ERR_PLAYER_NOT_FOUND);
                 return Response.ok(lb);
             }

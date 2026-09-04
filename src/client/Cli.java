@@ -35,6 +35,7 @@ public class Cli {
     private static final String GREEN  = "\u001b[32m";
     private static final String RED    = "\u001b[31m";
     private static final String YELLOW = "\u001b[33m";
+    private static final String BG_MAGENTA = "\u001b[45m";
     // Gson per riconvertire il payload nel POJO di destinazione.
     private static final Gson GSON = new Gson();
 
@@ -403,7 +404,8 @@ public class Cli {
         section("CLASSIFICA");
         int i = 1;
         for (LeaderboardPayload.Row row : o.leaderboard) {
-            String pre = i <= 3 ? YELLOW + BOLD : "";
+            String pre = (i <= 3 ? YELLOW : "") + (Boolean.TRUE.equals(row.requester) ? BG_MAGENTA : "")
+                    + (i <= 3 || Boolean.TRUE.equals(row.requester) ? BOLD : "");
             System.out.println("  " + pre + String.format("%2d. %-20s %6d", i, row.username, row.cumulativeScore) + RESET);
             i++;
         }

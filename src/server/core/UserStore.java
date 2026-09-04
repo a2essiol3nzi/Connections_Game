@@ -119,9 +119,10 @@ public class UserStore {
             Integer id = nameToId.get(username);
             u = id == null ? null : byId.get(id);
         }
-        if (u == null) return Errors.ERR_USER_NOT_FOUND;
+        if (u == null) 
+            return Errors.ERR_INVALID_CREDENTIALS;
         synchronized (u) {
-            if (!Objects.equals(password, u.password)) return Errors.ERR_WRONG_PASSWORD;
+            if (!Objects.equals(password, u.password)) return Errors.ERR_INVALID_CREDENTIALS;
         }
         return null; // OK
     }
@@ -140,7 +141,7 @@ public class UserStore {
                 return Errors.ERR_USER_NOT_FOUND;  // difesa in caso di store incoerente
             synchronized (u) {
                 if (!Objects.equals(oldPsw, u.password)) 
-                    return Errors.ERR_WRONG_PASSWORD;
+                    return Errors.ERR_INVALID_CREDENTIALS;
                 if (newPsw != null) 
                     u.password = newPsw;
                 if ((newUsername != null) && (!newUsername.equals(oldUsername))) {

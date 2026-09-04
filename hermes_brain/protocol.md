@@ -20,14 +20,14 @@ Lato server l'identificazione è per **userId immutabile** (non username).
 | submitProposal | `operation`, `words:[4 STRING]` | 4 parole distinte (valutate per `userId`) |
 | requestGameInfo | `operation`, `gameId:INT` | `roundId = -1` = corrente; altro = storico (espone `assignment`+tema) |
 | requestGameStats | `operation`, `gameId:INT` | `roundId = -1` = corrente |
-| requestLeaderboard | `operation`, + `playerName`\|`topPlayers:INT` | `topPlayers` assente = tutti; rango risolto per id |
+| requestLeaderboard | `operation`, + `playerName`\|`topPlayers:INT` | `topPlayers` assente = tutti; rango risolto per id; la riga del client autenticato porta `requester:true` |
 | requestPlayerStats | `operation` | per `userId` loggato |
 
 ## Codici errore (enum `protocol/Errors`, centralizzato)
 - `BAD_REQUEST` — JSON illeggibile / operation mancante / `udpPort` assente o invalido
 - register: `ERR_USERNAME_TAKEN`, `ERR_INVALID`
-- updateCredentials: `ERR_WRONG_PASSWORD`, `ERR_USERNAME_TAKEN`, `ERR_USER_NOT_FOUND`
-- login: `ERR_WRONG_PASSWORD`, `ERR_USER_NOT_FOUND`, `ERR_ALREADY_LOGGED_IN`
+- updateCredentials: `ERR_INVALID_CREDENTIALS`, `ERR_USERNAME_TAKEN`, `ERR_USER_NOT_FOUND`
+- login: `ERR_INVALID_CREDENTIALS` (utente inesistente O psw errata, stesso codice — anti-enumerazione), `ERR_ALREADY_LOGGED_IN`
 - logout: `ERR_NOT_LOGGED_IN`
 - submitProposal: `ERR_NOT_LOGGED_IN`, `ERR_NO_ACTIVE_GAME`, `ERR_GAME_OVER_FOR_YOU`,
   `ERR_MALFORMED` (parola non nel gioco / già assegnata / ≠4 distinte), `ERR_NOT_JOINED`

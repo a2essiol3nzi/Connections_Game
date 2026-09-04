@@ -16,6 +16,7 @@ punteggio cumulativo e (opzionale) il rango di un utente richiesto via
 |------|------|
 | `username` | String |
 | `cumulativeScore` | int |
+| `requester` | Boolean | presente e `true` solo nella riga dell'utente autenticato che ha richiesto la classifica |
 
 ## Collegamenti
 - `server/core/GameManager`: build (`leaderboard`).

@@ -79,7 +79,8 @@ render dispatch sceglie la classe giusta in base all'operazione
   partecipanti (**con "(connessi)"**, è il conteggio live = solo chi è online)/
   in corso/media/finiti colorati (con `remainingSec` live).
 - `renderLeaderboard(LeaderboardPayload)` → sezione `CLASSIFICA`: i primi 3
-  ranghi in `YELLOW BOLD`.
+  ranghi in `YELLOW BOLD`; la riga del richiedente (`requester=true`) ha anche
+  sfondo `MAGENTA BOLD`, quindi resta visibile pure se è già sul podio.
 - `renderPlayerStats(PlayerStatsPayload)` → sezione `STATISTICHE PERSONALI`:
   valori colorati, `mistakeHistogram` con etichette (`0/1/2/3 err`, `persa`,
   `non fin`).

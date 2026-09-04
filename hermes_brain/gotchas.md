@@ -29,6 +29,10 @@
   ritorna `false` se già online → handler risponde `ERR_ALREADY_LOGGED_IN`. Aggiunti
   `BAD_REQUEST` (JSON illeggibile/operation mancante/udpPort assente) e
   `ERR_PLAYER_NOT_FOUND`.
+- **Anti-enumerazione login**: `UserStore.login` restituisce
+  `ERR_INVALID_CREDENTIALS` sia per username inesistente sia per password errata.
+  `updateCredentials` conserva `ERR_USER_NOT_FOUND` per `oldUsername` inesistente,
+  ma restituisce `ERR_INVALID_CREDENTIALS` per la sola `oldPsw` errata.
 
 ## Bug caught da verifica
 - `GameLoader` streaming con `CountingInputStream` → offset errati. Fix: `RandomAccessFile`+span → poi **`JsonReader`+`skipValue`** (O(1), robusto su oggetti malformati a runtime).

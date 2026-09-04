@@ -53,9 +53,10 @@ storico PERSISTITO** e aggiorna le statistiche (`UserStore`).
   nella partita (`onlineUsers ∩ players`); chi si disconnette non conta più, pur
   restando in `players` (non va ripulita: `finalizeGame` la itera per storico +
   stats cumulative). `inProgress`/`finished`/`won` tra i presenti.
-- `leaderboard(playerName, topK, store)` → **`LeaderboardPayload`** — snapshot
+- `leaderboard(playerName, topK, requesterId, store)` → **`LeaderboardPayload`** — snapshot
   `(id,score)` con lock granulare per utente, sort+rank DOPO; weak consistency
-  accettata (read-only). `null` ⇒ `ERR_PLAYER_NOT_FOUND`.
+  accettata (read-only). La riga con `id == requesterId` porta `requester=true`
+  per la resa client; `null` ⇒ `ERR_PLAYER_NOT_FOUND`.
 - `playerStats(userId, store)` → **`PlayerStatsPayload`** — snapshot di TUTTI i
   campi sotto `synchronized(u)`. `null` ⇒ `ERR_USER_NOT_FOUND`.
 - `finalizeGame(store)` — `synchronized`, **idempotente**

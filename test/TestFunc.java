@@ -48,8 +48,8 @@ public class TestFunc {
         try (TC c = new TC(port, 40000)) {
             // login senza udpPort non ha wrapper dedicato: campo null
             T.check("login senza udpPort", c.call(noUdpLoginReq("t_user", "pw")), "ERROR", "BAD_REQUEST", null);
-            T.err("login psw errata", c.login("t_user", "sbagliata", 40000), "ERR_WRONG_PASSWORD");
-            T.err("login utente inesistente", c.login("fantasma", "pw", 40000), "ERR_USER_NOT_FOUND");
+            T.err("login psw errata", c.login("t_user", "sbagliata", 40000), "ERR_INVALID_CREDENTIALS");
+            T.err("login utente inesistente", c.login("fantasma", "pw", 40000), "ERR_INVALID_CREDENTIALS");
             T.ok("login OK", c.login("t_user", "pw", 40000));
             T.err("login doppio stessa conn", c.login("t_user", "pw", 40000), "ERR_ALREADY_LOGGED_IN");
         }
@@ -132,7 +132,8 @@ public class TestFunc {
             Response lb = c.leaderboard(null, 2);
             T.check("leaderboard top2 OK", lb, "OK", null,
                     x -> { LeaderboardPayload l = c.asLb(x);
-                           return l.leaderboard != null && l.leaderboard.size() <= 2; });
+                           return l.leaderboard != null && l.leaderboard.size() <= 2
+                                   && Boolean.TRUE.equals(l.leaderboard.get(0).requester); });
             T.err("leaderboard playerName inesistente", c.leaderboard("nope", null), "ERR_PLAYER_NOT_FOUND");
         }
 
@@ -169,7 +170,7 @@ public class TestFunc {
             T.ok("logout", c3.logout());
         }
         try (TC c4 = new TC(port, 40000)) {
-            T.err("login vecchia psw ora errata", c4.login("t_user2", "pw", 40000), "ERR_WRONG_PASSWORD");
+            T.err("login vecchia psw ora errata", c4.login("t_user2", "pw", 40000), "ERR_INVALID_CREDENTIALS");
         }
 
         // ==== 9. INPUT HOSTILI ====

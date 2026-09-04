@@ -10,6 +10,7 @@ public class LeaderboardPayload {
     public static class Row {
         public String username;
         public int cumulativeScore;
+        public Boolean requester; // (non boolean) affinché Gson ometta il campo per tutte le altre righe
     }
 
     public List<Row> leaderboard;

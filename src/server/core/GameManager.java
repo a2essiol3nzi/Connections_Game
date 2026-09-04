@@ -339,7 +339,7 @@ public class GameManager {
     // user singoli, non globale. Tra la lettura di Alice e Bob, finalizeGame() potrebbe
     // aggiornare stats. Questo è ACCETTABILE: leaderboard è read-only. 
     // Evita bottleneck di serializzazione con finalizeGame().
-    public LeaderboardPayload leaderboard(String playerName, Integer topK, UserStore store) {
+    public LeaderboardPayload leaderboard(String playerName, Integer topK, int requesterId, UserStore store) {
         LeaderboardPayload p = new LeaderboardPayload();
         List<UserStore.User> all = new ArrayList<>(store.allUsers());
         int targetId = -1;
@@ -374,6 +374,8 @@ public class GameManager {
                 row.username = (u == null) ? "" : u.username;
             }
             row.cumulativeScore = r[1];
+            if (r[0] == requesterId)
+                row.requester = true;
             p.leaderboard.add(row);
         }
         if (playerName != null) {

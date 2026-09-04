@@ -23,11 +23,13 @@ Won/Lost`, `notFinished`, `currentStreak`/`maxStreak`, `perfectPuzzles`,
   `nextId`, popola `nameToId`+`byId`. Poi **`persistQuiet()`** (persist
   event-driven, fuori dal lock). `null`=OK, altrimenti `Errors`.
 - `login(username, psw)` — lookup sotto `synchronized(this)`, confronto psw sotto
-  `synchronized(u)`. `null`=OK.
+  `synchronized(u)`. `null`=OK; username inesistente e psw errata restituiscono
+  entrambi `ERR_INVALID_CREDENTIALS` (anti-enumerazione).
 - `updateCredentials(oldUser, oldPsw, newUser, newPsw)` — `synchronized(this)` +
   `synchronized(u)`: rinomina solo l'indice secondario (`nameToId`), `byId` e le
   strutture keyed-by-id restano invariate. Poi **`persistQuiet()`** (persist
-  event-driven, fuori dal lock). `null`=OK.
+  event-driven, fuori dal lock). `null`=OK; `oldUsername` inesistente restituisce
+  `ERR_USER_NOT_FOUND`, `oldPsw` errata `ERR_INVALID_CREDENTIALS`.
 - `allUsers()` — lista snapshot per classifica.
 - `hasUser(name)`, `getByName(name)` (atomica sotto `this`), `getById(id)`
   (lookup diretto, l'id non cambia MAI).
