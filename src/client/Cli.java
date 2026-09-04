@@ -51,18 +51,20 @@ public class Cli {
 
     public static void printHelp() {
         section("AIUTO - COMANDI");
-        System.out.println("  " + CYAN + "register" + RESET + " <user> <psw>              registra un nuovo utente\n"
-            + "  " + CYAN + "update" + RESET + "   <oldU> <oldPsw> [newU|-] [newPsw|-]   aggiorna credenziali\n"
-            + "  " + CYAN + "login" + RESET + "    <user> <psw>                accedi (entra nella partita)\n"
-            + "  " + CYAN + "logout" + RESET + "                     esci dalla partita\n"
-            + "  " + CYAN + "submit" + RESET + "   <w1> <w2> <w3> <w4>        invia una proposta di gruppo\n"
-            + "  " + CYAN + "info" + RESET + "     [roundId]                 stato/esito partita (-1 = corrente)\n"
-            + "  " + CYAN + "stats" + RESET + "    [roundId]                 statistiche partita\n"
-            + "  " + CYAN + "leaders" + RESET + "  [ -k N | -name X ]         classifica (default: tutti)\n"
-            + "  " + CYAN + "me" + RESET + "       statistiche personali\n"
-            + "  " + CYAN + "clear" + RESET + "                    ripulisci lo schermo\n"
-            + "  " + CYAN + "quit" + RESET + "/" + CYAN + "exit" + RESET + "                   chiudi il client\n"
-            + "  " + CYAN + "help" + RESET + "                     mostra questo aiuto\n");
+        System.out.println(
+              "  " + CYAN + "register " + RESET + "   <user> <psw>      registra un nuovo utente\n"
+            + "  " + CYAN + "update   " + RESET + "   <oldU> <oldPsw> [newU|-] [newPsw|-]      aggiorna credenziali\n"
+            + "  " + CYAN + "login    " + RESET + "   <user> <psw>      accedi (entra nella partita)\n"
+            + "  " + CYAN + "logout   " + RESET + "   esci dalla partita\n"
+            + "  " + CYAN + "submit   " + RESET + "   <w1> <w2> <w3> <w4>      invia una proposta di gruppo\n"
+            + "  " + CYAN + "info     " + RESET + "   [roundId]      stato/esito partita (-1 = corrente)\n"
+            + "  " + CYAN + "stats    " + RESET + "   [roundId]      statistiche partita\n"
+            + "  " + CYAN + "leaders  " + RESET + "   [ -k N | -name X ]      classifica (default: tutti)\n"
+            + "  " + CYAN + "me       " + RESET + "   statistiche personali\n"
+            + "  " + CYAN + "clear    " + RESET + "   ripulisci lo schermo\n"
+            + "  " + CYAN + "quit/exit" + RESET + "   chiudi il client\n"
+            + "  " + CYAN + "help     " + RESET + "   mostra questo aiuto\n"
+        );
     }
 
     public void run() throws IOException {
