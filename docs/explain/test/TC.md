@@ -23,7 +23,8 @@ e chiamano `conn.sendAndRetreive`. `gameInfo`/`gameStats` impostano `r.roundId`
 1. Porte TCP/UDP **libere** (`ServerSocket(0)`/`DatagramSocket(0)`).
 2. Scrive `server.properties` temp con porte + `games.file` (produzione) e
    `persist`/`history` in `/tmp/conn_test_*`.
-3. `ProcessBuilder("java", "-cp", "out:lib/...", "server.core.ServerMain", cfg)`.
+3. Avvia `server.core.ServerMain` senza argomenti, con classpath assoluto e CWD
+   nella directory temporanea: il server legge il `server.properties` appena scritto.
 4. Attende (≤15s) che il server ascolti sulla porta TCP: bind OK = non ancora
    up, bind fallito = up. Ritorna `Server{proc, tcpPort}`.
 

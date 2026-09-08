@@ -15,7 +15,7 @@ import java.io.IOException;
 public class ClientMain {
 
     public static void main(String[] args) {
-        String cfgPath = (args.length > 0) ? args[0] : "client.properties";
+        String cfgPath = "client.properties";
 
         // 1) config
         ClientConfig cfg;

@@ -4,6 +4,7 @@
 
 ```
 Connections_Game/
+├── docs/               # relazione e modelli del sistema
 ├── src/                # sorgenti Java
 │   ├── client/         # ClientMain, ClientConfig, ClientConn, UdpClient, Cli
 │   ├── protocol/       # Request, Response, Errors, GameEnded, payload/*

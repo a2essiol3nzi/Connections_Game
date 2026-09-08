@@ -1,8 +1,7 @@
 # `ClientConfig` — parametri da file `.properties`
 
 ## Ruolo
-Carica i parametri del client da un file `client.properties` (default
-`client.properties`, o path passato come argomento). NO CLI/interattivo (§4).
+Carica i parametri del client dal file `client.properties`. NO CLI/interattivo (§4).
 
 ## Campi
 | Campo | Tipo | Chiave `.properties` | Default |

@@ -6,8 +6,7 @@ la connessione **NIO TCP**, crea il **receiver UDP** (porta effimera), avvia il
 thread di notifiche e infine esegue il loop CLI sul thread principale.
 
 ## Sequenza di avvio
-1. `ClientConfig.load(cfgPath)` (path da argomento o `client.properties`); su
-   errore → `exit(2)`.
+1. `ClientConfig.load("client.properties")`; su errore → `exit(2)`.
 2. `new ClientConn(cfg.host, cfg.tcpPort)` — connessione TCP persistente NIO.
 3. `new UdpClient(conn)` — **bind UDP su porta effimera** (necessario PRIMA del
    login: la porta va inviata al server come `udpPort`).

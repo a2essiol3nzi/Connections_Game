@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
  * Entry point del server.
  *
  * Sequenza di avvio:
- *   1. legge la config (server.properties o path passato come argomento);
+ *   1. legge la config server.properties;
  *   2. crea il GameLoader (streaming Gson, memoria O(1): nessuna partita in RAM);
  *   3. costruisce il Context (risorse condivise);
  *   4. avvia lo scheduler partita (la persistenza è EVENT-DRIVEN);
@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 public class ServerMain {
 
     public static void main(String[] args) {
-        String cfgPath = (args.length > 0) ? args[0] : "server.properties";
+        String cfgPath = "server.properties";
 
         // 1) config
         ServerConfig cfg;

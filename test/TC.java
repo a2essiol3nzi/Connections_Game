@@ -140,9 +140,9 @@ public final class TC implements AutoCloseable {
             w.write("history.file=" + tmp + "/history.json\n");
             w.write("persist.interval.sec=300\n");
         }
-        String cp = "out:lib/gson-2.11.0.jar";
-        Process proc = new ProcessBuilder("java", "-cp", cp, "server.core.ServerMain", cfgFile)
-                .directory(new java.io.File(projectDir))
+        String cp = projectDir + "/out:" + projectDir + "/lib/gson-2.11.0.jar";
+        Process proc = new ProcessBuilder("java", "-cp", cp, "server.core.ServerMain")
+                .directory(new java.io.File(tmp))
                 .redirectErrorStream(true).start();
         // attende che il server ASCOLTI sulla porta tcp.
         //  - bind RIUSCITO  => porta ancora LIBERA, il server non è ancora up.

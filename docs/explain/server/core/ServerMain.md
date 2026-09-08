@@ -5,8 +5,8 @@ Avvia il server: config → loader → Context → thread di supporto → shutdo
 → acceptor TCP sul thread principale.
 
 ## Sequenza di avvio
-1. **Config**: `ServerConfig.load(cfgPath)` (default `server.properties`; su
-   `IOException` → `System.exit(2)`).
+1. **Config**: `ServerConfig.load("server.properties")`; su `IOException` →
+   `System.exit(2)`.
 2. **Loader**: `new GameLoader(cfg.gamesFile)` (streaming Gson, memoria O(1): le
    partite non stanno mai tutte in RAM); su errore → `System.exit(3)`.
 3. **Context**: `new Context(cfg, loader)` (risorse condivise: `users`, `games`,
