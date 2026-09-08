@@ -10,17 +10,16 @@ import java.util.Set;
 
 /**
  * Scheduler della partita attiva. Ciclo: attende scadenza partita corrente 
- * -> finalizza (esiti+UserStore) -> persist event-driven (stat su disco 
- * subito) -> invia notifica UDP a tutti i partecipanti -> ruota alla partita 
- * successiva.
+ * -> finalizza (esiti+UserStore) -> persist event-driven (stat su disco
+ * subito) -> ruota alla partita successiva -> invia la notifica UDP ai
+ * partecipanti della partita appena conclusa.
  * Coordinazione via Thread.sleep fino a endTime (no wait/notify necessario).
  * Lo swap di ActiveGame avviene in GameManager.rotate (synchronized).
  * 
- * La notifica UDP (type: GAME_ENDED + gameId/roundId) è un segnale, non contiene 
- * i risultati. I client, ricevuto il segnale, vanno a leggere l'esito via TCP con 
- * requestGameInfo(roundId) / requestGameStats, che attingono dallo storico in 
- * GameManager.history. Se la notifica arrivasse prima di finalizeGame, si aprirebbe 
- * una TOCTOU window.
+ * La notifica UDP (type: GAME_ENDED + gameId/roundId) è un segnale, non contiene
+ * i risultati. La rotazione avviene prima dell'invio: il round notificato non è
+ * più `current`, quindi requestGameInfo(roundId) / requestGameStats leggono
+ * deterministicamente GameManager.history.
  */
 public class GameScheduler implements Runnable {
 
@@ -47,15 +46,15 @@ public class GameScheduler implements Runnable {
                 sleep(waitMs); // durata partita
             gameMan.finalizeGame(users);
             try {
-                users.persist(); // persist event-driven
+                users.persistUsers(); // persist event-driven
                 gameMan.persistHistory(); // persistenza storico partite su disco
             } catch (IOException e) {
                 System.err.println("[Scheduler] persist failed: " + e.getMessage());
             }
             Set<Integer> parts = g.participants();
+            gameMan.rotate(System.currentTimeMillis());
             notifier.notifyEnd(parts, new GameEnded("GAME_ENDED", g.gameId, g.roundId));
             System.out.println("[Scheduler] game " + g.gameId + " (round " + g.roundId + ") ended, " + parts.size() + " players");
-            gameMan.rotate(System.currentTimeMillis());
         }
     }
 

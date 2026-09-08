@@ -62,10 +62,11 @@ lo espone includendo il `theme` (a fine partita è lecito). `finalizeGame` è **
 (`compareAndSet` su `finalized`): chiamato da scheduler + shutdown hook + timer, conta 1 sola volta.
 
 ## Notifiche async UDP (§2.2, §3)
-Al termine partita: `GameScheduler` invia a ogni partecipante (unicast, endpoint
-dal `UdpRegistry`) `{type:"GAME_ENDED", gameId, roundId}`. **La notifica è un
-segnale, NON contiene i risultati**: il client, ricevutala, legge l'esito via TCP
-(`requestGameInfo(roundId)` / `requestGameStats`) attingendo dallo storico
-`GameManager.history`. Per evitare la finestra TOCTOU (notifica arriva prima di
-`finalizeGame`), il client deve attendere/ritentare la lettura storico.
+Al termine partita: `GameScheduler` finalizza e persiste, fa `rotate()`, poi invia
+a ogni partecipante della partita conclusa (unicast, endpoint dal `UdpRegistry`)
+`{type:"GAME_ENDED", gameId, roundId}`. **La notifica è un segnale, NON contiene
+i risultati**: il client legge l'esito via TCP (`requestGameInfo(roundId)` /
+`requestGameStats`) dallo storico `GameManager.history`. Poiché il `roundId`
+notificato non è più quello di `current`, la risposta storica è completa subito:
+nessun retry TOCTOU.
 Client deve avere thread UDP in ascolto (C2) concorrente al NIO TCP.

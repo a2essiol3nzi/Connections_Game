@@ -7,7 +7,7 @@
 | S2 | Loader partite (`loader/GameLoader`) | 🟢 | **PIGRO**: streaming Gson `JsonReader` O(1); `CyclicGameIterator` (classe pubblica); skip entry malformate a runtime |
 | S3 | UserStore (`core/UserStore`) | 🟢 | **in `core/`**; id immutabile + indice `nameToId`; metodi ritornano `Errors`; `getById`/`getByName`; per-account lock; psw in chiaro; persist atomico: build in-memory sotto `this`, **disk I/O su `ioLock`** (non blocca register/login) |
 | S4 | Game model (`core/ActiveGame`/`PlayerState`) | 🟢 | `roundId` univoco + `finalized` (AtomicBoolean); stato per **userId**; enum `JoinResult`/`SubmitResult` con `Errors`; `Outcome`; verificato |
-| S5 | Scheduler (`network/GameScheduler`) | 🟢 | sleep→finalize(idempotente)→**persist event-driven (utenti+storico)**→UDP(segnale, non risultati)→rotate(auto-join online); `sleep()` ricalcola deadline e ritenta su interrupt |
+| S5 | Scheduler (`network/GameScheduler`) | 🟢 | sleep→finalize(idempotente)→**persist event-driven (utenti+storico)**→rotate(auto-join online)→UDP ai partecipanti catturati; il round notificato è già storico e non richiede retry; `sleep()` ricalcola deadline e ritenta su interrupt |
 | S6 | TCP acceptor+pool (`network/ConnectionAcceptor`) | 🟢 | |
 | S7 | Handler (`network/ClientHandler`) | 🟢 | dispatch 9 op; gate auth; `udpPort` obbligatorio + registro UDP; catch(Exception) non uccide worker; `Errors`/`null`; **`handleProposal` senza lock globale** (era double-lock ridondante) |
 | S8 | UDP registry+notifier (`network/UdpRegistry`/`UdpNotifier`) | 🟢 | registry userId→endpoint; notifier unicast con **un solo DatagramSocket riusato** (+`connect(addr,port)` per destinatario, non bloccante su host irraggiungibili); payload `GAME_ENDED`+roundId (solo segnale) |
@@ -20,7 +20,7 @@
 | ID | Componente | Stato | Note |
 |----|-----------|-------|------|
 | C1 | Client NIO (`client.ClientConn`) | 🟢 | `SocketChannel`+`Selector`; `send()` **synchronized** serializza righe |
-| C2 | Client UDP (`client.UdpClient`) | 🟢 | bind effimera (porta nel login); `GAME_ENDED`→retry TCP su storico (TOCTOU) |
+| C2 | Client UDP (`client.UdpClient`) | 🟢 | bind effimera (porta nel login); `GAME_ENDED`→singolo fetch TCP dello storico già stabile |
 | C3 | Client CLI (`client.Cli`+`ClientMain`) | 🟢 | 9 op + render; board/risultati/stats; payload riconvertiti in **POJO** (`protocol/payload`) via `Cli.payload(res,Class)` |
 | C4 | Client config (`client.ClientConfig`+`client.properties`) | 🟢 | `host`+`port`; UDP effimera |
 

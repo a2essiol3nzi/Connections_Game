@@ -64,16 +64,21 @@ public class GameManager {
     private final CyclicGameIterator games; // iteratore ciclico sul loader pigro
 
     // Partita globale attiva (null solo se il loader è vuoto).
-    // volatile + costruita PRIMA dell'assegnazione -> visibilità corretta senza lock in lettura.
+    /* La write volatile pubblica un ActiveGame costruito PRIMA dell'assegnazione:
+     * chi legge current dopo quella write vede anche la sua inizializzazione completa.
+     * Non rende però atomico il seguito di rotate (auto-join), né una sequenza
+     * read-current + operazione: players/finalized hanno primitive proprie.
+     * (lettura senza lock è sicura)
+     */
     private volatile ActiveGame current;
-    // Storico partite CONCLUSE: roundId -> (groups con tema + userId -> esito/score).
-    // Senza limite (richiesta di progetto): cresce un round (~KB/history a 600s/partita,
-    // ~160 round/giorno => ~KB-GB giornaliere) e l'intera mappa e' TENUTA IN RAM per
-    // servire richieste storiche arbitrarie. Il costo in RAM è proporzionale a giorni di
-    // runtime: poche centinaia di KB al giorno, irrilevante per una JVM (heap default già
-    // ≥256MB); il vero costo crescente è il file e il BOOT (loadHistory deserializza tutto).
-    // TRADEOFF accettato per scope didattico: persist su JSON senza DB. In produzione con
-    // storico illimitato si userebbe un DB (WAL/append) che evita RAM+rewrite-integrali.
+    /* Storico partite CONCLUSE: roundId -> (groups con tema + userId -> esito/score).
+     * Senza limite (richiesta di progetto): cresce un round (~KB/history a 600s/partita,
+     * ~160 round/giorno => ~KB-GB giornaliere) e l'intera mappa e' TENUTA IN RAM per
+     * servire richieste storiche arbitrarie. Il vero costo crescente è il file e il BOOT 
+     * (loadHistory deserializza tutto). 
+     * TRADEOFF accettato per scopo didattico: persist su JSON senza DB. In produzione con
+     * storico illimitato si userebbe un DB (WAL/append) che evita RAM+rewrite-integrali.
+     */
     private final Map<Integer, GameHistory> history = new ConcurrentHashMap<>();
     // Utenti attualmente loggati (per auto-join).
     private final Set<Integer> onlineUsers = ConcurrentHashMap.newKeySet();

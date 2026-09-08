@@ -1,6 +1,12 @@
+import com.google.gson.Gson;
+import protocol.GameEnded;
 import protocol.Response;
+import protocol.payload.GameInfoPayload;
 import protocol.payload.PlayerStatsPayload;
 
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,6 +29,8 @@ import java.util.List;
  */
 public class TestStats {
 
+    private static final Gson GSON = new Gson();
+
     public static int run(String projectDir) throws Exception {
         // server dedicato: durata breve per ruotare velocemente i round
         TC.Server srv = TC.startServer(projectDir, 3);
@@ -34,9 +42,9 @@ public class TestStats {
 
             T.section("Stats sub-logic (streak/winRate/histogram) su game reali");
 
-            try (TC c = new TC(port, 41000)) {
+            try (DatagramSocket udp = new DatagramSocket(0); TC c = new TC(port, udp.getLocalPort())) {
                 T.ok("register", c.register("s_user", "pw"));
-                T.ok("login (auto-join round 1)", c.login("s_user", "pw", 41000));
+                T.ok("login (auto-join round 1)", c.login("s_user", "pw", udp.getLocalPort()));
                 int r1 = c.asGameInfo(c.gameInfo(-1)).gameId; // roundId del round 1 corrente
 
                 // ---- ROUND 1: WIN ----
@@ -50,6 +58,12 @@ public class TestStats {
                         T.cond("round1 submit gruppi[gi] CORRECT", false);
                     }
                 }
+                GameEnded ended = awaitGameEnded(udp);
+                Response endedInfo = c.gameInfo(ended.roundId);
+                GameInfoPayload historic = c.asGameInfo(endedInfo);
+                T.cond("UDP dopo rotate: storico completo", ended.roundId == r1
+                        && "OK".equals(endedInfo.status) && historic.assignment != null
+                        && historic.assignment.size() == 4 && historic.outcome != null);
                 // attendi fine round1 (finalizeGame): currentStreak=1, winRate=100 ...
                 PlayerStatsPayload p1 = awaitPuzzleCount(c, 1);
                 T.cond("dopo WIN: puzzlesCompleted=1", p1.puzzlesCompleted == 1);
@@ -103,6 +117,19 @@ public class TestStats {
             Thread.sleep(300);
         }
         throw new AssertionError("puzzlesCompleted non ha raggiunto " + n + " in tempo");
+    }
+
+    /** Riceve il segnale UDP della fine partita entro 10 secondi. */
+    private static GameEnded awaitGameEnded(DatagramSocket udp) throws Exception {
+        udp.setSoTimeout(10000);
+        byte[] buffer = new byte[512];
+        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+        udp.receive(packet);
+        String json = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
+        GameEnded ended = GSON.fromJson(json, GameEnded.class);
+        if (ended == null || !"GAME_ENDED".equals(ended.type))
+            throw new AssertionError("notifica UDP inattesa");
+        return ended;
     }
 
     /**

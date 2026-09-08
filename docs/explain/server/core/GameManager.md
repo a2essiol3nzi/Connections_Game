@@ -8,9 +8,10 @@ storico PERSISTITO** e aggiorna le statistiche (`UserStore`).
 
 ## Stato interno
 - `loader`, `durationSec`, `rnd`, `games` (`CyclicGameIterator`).
-- `current` — `ActiveGame` **`volatile`**: visibilità cross-thread senza lock in
-  lettura; assegnato SOLO in `rotate()` (synchronized) e nel costruttore, sempre
-  costruito PRIMA della pubblicazione → nessun oggetto "semivisto".
+- `current` — `ActiveGame` **`volatile`**: la write in `rotate()` pubblica il
+  riferimento solo DOPO `makeNext()`/costruttore. Per Java Memory Model, quella
+  write *happens-before* una read volatile che la osserva: la partita letta non è
+  "semivista" e include campi inizializzati (board, gruppi, deadline, `roundId`).
 - `history` — `ConcurrentHashMap<Integer,GameHistory>` partite CONCLUSE, chiave =
   **`roundId`**, **TENUTA IN RAM** per servire richieste storiche arbitrarie.
   - `GameHistory { roundId, sourceGameId, GameData.Group[4] (tema+parole),
@@ -31,8 +32,13 @@ storico PERSISTITO** e aggiorna le statistiche (`UserStore`).
   (= `roundId % total`, dove `roundId` = round già giocati da `loadHistory`),
   avanzando e scartando quelle partite. Così si riparte dalla partita successiva
   all'ultima mostrata prima dello shutdown, non dalla prima del file.
-- `current()` — lettura **lock-free** (campo `volatile`). Sbloccata la path di
-  lettura (`gameInfo`/`gameStats`/`join`/`submitProposal`).
+- `current()` — lettura **lock-free** (campo `volatile`). La richiesta può
+  legittimamente vedere il round vecchio o quello nuovo se corre con `rotate()`,
+  ma mai un riferimento stantio/corrotto o un oggetto non inizializzato.
+  Non è una transazione: l'auto-join avviene dopo lo swap e i campi mutabili sono
+  protetti separatamente da `ConcurrentHashMap`, `AtomicBoolean` e
+  `synchronized(ps)`. Sbloccata la path di lettura
+  (`gameInfo`/`gameStats`/`join`/`submitProposal`).
 - `rotate(nowMs)` — `synchronized`: `current = makeNext()` + auto-join di tutti
   gli online. `makeNext()` fa I/O (loader.next) sotto il monitor, ma una volta
   per partita (~600s) → `ponytail:` impatto trascurabile; fix quando misurabile
@@ -81,6 +87,15 @@ scrittore (scheduler via `finalizeGame`). `leaderboard`/`playerStats` leggono le
 stat sotto `synchronized(u)` (weak consistency tra utenti, accettabile per query
 read-only). Solo `synchronized`/`volatile`/`Atomic*`/`ConcurrentHashMap`
 (NO `locks.*`).
+
+**Perché il lock-free è sicuro**: una write su un campo `volatile` impone una
+barriera di pubblicazione; una read dello stesso campo che osserva quella write
+vede tutte le scritture precedenti del thread scheduler. `current` cambia solo
+come riferimento, mai mutando l'identità della partita già pubblicata. La
+rotazione può comunque avvenire tra `current()` e `submit()`: è una TOCTOU
+ammessa e resa innocua dal CAS `finalized`/dall'idempotenza di `finalizeGame`,
+che rifiutano il submit sul vecchio round. `volatile` da solo non basterebbe per
+contatori o insiemi mutabili: per quelli il codice usa le primitive sopra.
 
 ## Persistenza storico (scelta didattica)
 Storico intero riscritto su file JSON atomico (tmp + `ATOMIC_MOVE`). In

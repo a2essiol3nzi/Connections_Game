@@ -7,9 +7,8 @@ mandato al server nel `login` come `udpPort`.
 
 > `GAME_ENDED` è **solo un segnale** (gameId/roundId), NON contiene i risultati.
 > Al suo arrivo si va a leggere l'esito via TCP con `requestGameInfo(roundId)`.
-> Se la notifica arriva prima che il server abbia finalizzato (finestra
-> TOCTOU, vedi `hermes_brain/gotchas.md`) la lettura restituisce
-> `ERR_GAME_NOT_FOUND`: si riprova per un numero finito di volte poi si abbandona.
+> Lo scheduler ha già ruotato `current`, dunque il round notificato viene sempre
+> risolto dallo storico completo: non esiste retry lato client.
 
 ## Stato
 - `sock` — `DatagramSocket` (0 = effimera); `port()` rende il valore da
@@ -22,17 +21,14 @@ mandato al server nel `login` come `udpPort`.
 `type=="GAME_ENDED"` → `printResult(roundId)`. Payload ignoto/UDP ignorato
 (catch Exception). Su `IOException` di receive, se `running` logga e continua.
 
-## `printResult(roundId)` — retry anti-TOCTOU
+## `printResult(roundId)` — fetch storico singolo
 - Prima dello stampo asincrono chiama `Cli.clearInputLine()` (cancella la riga di
   input corrente, ANSI `\r\u001b[2K`) per non lasciare il prompt sporco/residui.
 - Invia `requestGameInfo` (roundId) via `ClientConn.sendAndRetreive`.
-- `ERR_GAME_NOT_FOUND` ⇒ storico non ancora finalizzato ⇒ `sleep(RETRY_DELAY_MS)`
-  e riprova (fino a `MAX_RETRY`).
 - OK ⇒ stampa esito con `Cli.renderGameInfo(GameInfoPayload)` (il payload
   `Object` viene riconvertito con `GSON.fromJson(GSON.toJson(r.payload), GameInfoPayload.class)`); poi ridisegna il prompt `Cli.printPrompt()`.
-- `ERR_...` ≠ not-found ⇒ esito non disponibile; `IOException` ⇒ abbandona.
+- `ERR_...` ⇒ esito non disponibile; `IOException` ⇒ abbandona.
 
-`MAX_RETRY=10`, `RETRY_DELAY_MS=200` (~2s coprono la finestra TOCTOU).
 `ponytail:` la cancellazione è ANSI, il buffer canonico di stdin non è svuotabile
 senza una libreria raw (es. JLine) — gestiamo la parte visiva, il testo già
 battuto dall'utente resta nel buffer del terminale. Add JLine quando serva un

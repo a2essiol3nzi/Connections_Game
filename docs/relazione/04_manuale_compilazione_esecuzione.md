@@ -32,9 +32,9 @@ I target del `Makefile` sono: `compile`, `jar`, `run`, `run-client`, `clean`. La
 
 Nella cartella `scripts/` sono disponibili tre script di uso immediato:
 
-- `scripts/build.sh` — esegue `make clean` + `make`, compila tutto in `out/` e genera i JAR in `dist/`, con output colorato e conteggio delle classi compilate.
-- `scripts/run-server.sh` — avvia il server dal JAR `dist/connections-server.jar` (richiede che l'abbia già generato `build.sh`).
-- `scripts/run-client.sh` — avvia il client dal JAR `dist/connections-client.jar` (idem).
+- `scripts/build.sh` - esegue `make clean` + `make`, compila tutto in `out/` e genera i JAR in `dist/`, con output colorato e conteggio delle classi compilate.
+- `scripts/run-server.sh` - avvia il server dal JAR `dist/connections-server.jar` (richiede che l'abbia già generato `build.sh`).
+- `scripts/run-client.sh` - avvia il client dal JAR `dist/connections-client.jar` (idem).
 
 Uso tipico: `./scripts/build.sh` la prima volta, poi `./scripts/run-server.sh` per far partire il server e `./scripts/run-client.sh` in un altro terminale per il client.
 
@@ -46,10 +46,7 @@ Avvio (dal JAR, col `Main-Class` `server.core.ServerMain`):
 ```
 make run                                # da Makefile
 java -jar dist/connections-server.jar   # dal JAR eseguibile
-java -cp 'out:lib/gson-2.11.0.jar' server.core.ServerMain
 ```
-
-È possibile passare un path alternativo al file `.properties` come primo argomento.
 
 ## Esecuzione del client
 
@@ -59,12 +56,6 @@ Avvio:
 ```
 make run-client                          # da Makefile
 java -jar dist/connections-client.jar    # dal JAR eseguibile
-java -cp 'out:lib/gson-2.11.0.jar' client.ClientMain
 ```
 
-Anche qui si può passare un path alternativo al `.properties`.
-
 > In generale, sia per client che server, usare gli scripts forniti è più semplice e preferibile. 
-
-Dopo il `login`, il server invia al client notifiche **UDP asincrone** di fine partita (`GAME_ENDED`); il receiver del client legge poi l'esito via **TCP** (il segnale UDP non trasporta i risultati).
-

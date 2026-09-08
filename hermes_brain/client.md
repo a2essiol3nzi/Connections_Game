@@ -22,7 +22,7 @@
 | `ClientMain` | `main` (vincolo §4 naming). Carica `ClientConfig`, avvia receiver? No: il socket UDP va bindato PRIMA del login (serve port). Order: create UdpReceiver (bind) → conn NIO → CLI loop |
 | `ClientConfig` | legge `client.properties` → `host`, `tcpPort`. UDP port auto (effimera) |
 | `ClientConn` (NIO) | `SocketChannel`+`Selector`. `send(Request)->Response` **synchronized(conn)**: scrive JSON+`\n`, leggi riga-risposta. Usato da CLI loop + da UdpReceiver |
-| `UdpClient` | bind a port effimera su localhost; thread in ascolto. Su `GAME_ENDED{roundId}` → `retry(requestGameInfo(roundId), n)` via `ClientConn` → azzera TOCTOU (gotchas). Se non loggato ignora |
+| `UdpClient` | bind a port effimera su localhost; thread in ascolto. Su `GAME_ENDED{roundId}` → un solo `requestGameInfo(roundId)` via `ClientConn`: lo scheduler ha già ruotato e il round è storico. Se non loggato ignora |
 | `Cli` | loop stdin: parse comando → Request → render payload. |
 
 `client.properties`:
@@ -54,7 +54,7 @@ Login = invio `login` con `udpPort` = port del receiver (mandato nel JSON, NON n
 ## Insidie client
 1. **NIO mono-legge**: il receiver UDP è UN thread separato; `ClientConn.send` è `synchronized` sul canale per non intrecciare righe. Non usare `Selector` per UDP.
 2. **UDP bound prima del login**: bind effimero a bootstrap, terza alla connessione server.
-3. **GAME_ENDED è solo un segnale** → se territorio, retry lettura storico (TOCTOU, gotchas.md). Segnale ignorato se no ID / no loggato.
+3. **GAME_ENDED è solo un segnale** → il server ruota prima di inviarlo; il relativo `roundId` risolve subito nello storico completo. Segnale ignorato se no ID / no loggato.
 4. **Reorder/firewlen**: `reuseAddress` così da poter riscoltare dopo logout; socket UDP non usato dal server dopo logout.
 5. **Errors UI**: stampa `errorCode` umano (mappa `Errors` code→text).
 6. **Punteggio wrong/malformed**: render distinto (giallo warn per malformata) seguendo §2.2.

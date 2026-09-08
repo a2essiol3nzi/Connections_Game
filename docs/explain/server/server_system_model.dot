@@ -1,7 +1,7 @@
 digraph Server {
-  rankdir=LR;
-  graph [bgcolor=white, fontname="Inter, Arial, Helvetica, sans-serif", splines=true, dpi=96,
-         nodesep=1.2, ranksep=1.4, pad="0.6,0.6", labelloc="t"];
+  rankdir=TB;
+  graph [bgcolor=white, fontname="Inter, Arial, Helvetica, sans-serif", splines=true, dpi=192,
+         nodesep=0.6, ranksep=0.8, pad="0.4,0.4", labelloc="t"];
   node  [fontname="Inter, Arial, Helvetica, sans-serif", shape=box, style="rounded,filled",
          fontsize=12, margin=0.25];
   edge  [fontname="Inter, Arial, Helvetica, sans-serif", fontsize=10, color="#555555",
@@ -20,14 +20,14 @@ digraph Server {
   subgraph cluster_sched {
     label="THREAD 2 · scheduler (1)"; fontsize=13; fontcolor="#92400e"; style="rounded,filled";
     fillcolor="#fdf6e3"; color="#d97706";
-    Sched [label="GameScheduler\nsleep → finalizeGame → persist\n→ notifier.notifyEnd → rotate", fillcolor="#ffffff", color="#d97706", fontcolor="#111827"];
+    Sched [label="GameScheduler\nsleep → finalizeGame → persist\n→ rotate → notifier.notifyEnd", fillcolor="#ffffff", color="#d97706", fontcolor="#111827"];
   }
 
   // ===== THREAD 3 · shutdown hook =====
   subgraph cluster_hook {
     label="THREAD 3 · shutdown hook (1)"; fontsize=13; fontcolor="#92400e"; style="rounded,filled";
     fillcolor="#fdf6e3"; color="#d97706";
-    Hook [label="ShutdownHook (JVM)\nSIGTERM/SIGINT\nusers.persist() + persistHistory()", fillcolor="#ffffff", color="#d97706", fontcolor="#111827"];
+    Hook [label="ShutdownHook (JVM)\nSIGTERM/SIGINT\nusers.persistUsers() + persistHistory()", fillcolor="#ffffff", color="#d97706", fontcolor="#111827"];
   }
 
   // ===== THREAD POOL: N ClientHandler (on-demand) =====
@@ -56,10 +56,10 @@ digraph Server {
   Pool   -> Reg   [label="register(body) endpoint"];
 
   // ===== archi: scheduler / hook (ciclo di vita + persistenza) =====
-  Sched  -> GM    [label="finalizeGame / rotate"];
-  Sched  -> Store [label="persist() (stats post-finalize)"];
-  Sched  -> Notif [label="notifyEnd(...)"];
-  Hook   -> Store [label="persist()"];
+  Sched  -> GM    [label="finalizeGame / rotate\n(round diventa storico)"];
+  Sched  -> Store [label="persistUsers() (post-finalize)"];
+  Sched  -> Notif [label="notifyEnd(snapshot parts)\nDOPO rotate"];
+  Hook   -> Store [label="persistUsers()"];
   Hook   -> GM    [label="persistHistory()"];
 
   // ===== notifier: usa registry =====

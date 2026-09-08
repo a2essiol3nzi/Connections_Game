@@ -166,7 +166,7 @@ public class ActiveGame {
             if (!boardLower.contains(w)) 
                 return SubmitResult.ERR_MALFORMED; // parola non proposta
         synchronized (ps) {
-            // Richeck finalized (potrebbe essere cambiato tra step 1 e ora)
+            // Richeck finalized
             if (finalized.get()) 
                 return SubmitResult.ERR_FINISHED;
             if (ps.finished) 

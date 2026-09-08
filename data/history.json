@@ -166,5 +166,105 @@
         "outcome": "NOT_FINISHED"
       }
     }
+  },
+  "4": {
+    "roundId": 4,
+    "sourceGameId": 3,
+    "groups": [
+      {
+        "theme": "SNEAKER BRANDS",
+        "words": [
+          "NIKE",
+          "REEBOK",
+          "ADIDAS",
+          "PUMA"
+        ]
+      },
+      {
+        "theme": "MUSICALS BEGINNING WITH “C”",
+        "words": [
+          "CATS",
+          "CAROUSEL",
+          "CHICAGO",
+          "CABARET"
+        ]
+      },
+      {
+        "theme": "CLEANING VERBS",
+        "words": [
+          "VACUUM",
+          "DUST",
+          "SWEEP",
+          "MOP"
+        ]
+      },
+      {
+        "theme": "___ MAN SUPERHEROES",
+        "words": [
+          "SUPER",
+          "BAT",
+          "IRON",
+          "SPIDER"
+        ]
+      }
+    ],
+    "entries": {
+      "2": {
+        "correct": 0,
+        "errors": 0,
+        "score": 0,
+        "outcome": "NOT_FINISHED"
+      }
+    }
+  },
+  "5": {
+    "roundId": 5,
+    "sourceGameId": 4,
+    "groups": [
+      {
+        "theme": "STREAMING SERVICES",
+        "words": [
+          "PRIME",
+          "PEACOCK",
+          "HULU",
+          "NETFLIX"
+        ]
+      },
+      {
+        "theme": "CONDIMENTS",
+        "words": [
+          "TARTAR",
+          "RELISH",
+          "MAYO",
+          "KETCHUP"
+        ]
+      },
+      {
+        "theme": "SYNONYMS FOR SAD",
+        "words": [
+          "DOWN",
+          "BLUE",
+          "LOW",
+          "GLUM"
+        ]
+      },
+      {
+        "theme": "CLUE CHARACTERS",
+        "words": [
+          "PLUM",
+          "GREEN",
+          "MUSTARD",
+          "SCARLET"
+        ]
+      }
+    ],
+    "entries": {
+      "2": {
+        "correct": 0,
+        "errors": 4,
+        "score": -16,
+        "outcome": "LOST"
+      }
+    }
   }
 }

@@ -19,10 +19,10 @@ dal formato).
 | `roundId` | int | id univoco/monotono, usato nelle richieste di esito |
 
 ## Note
-È **solo un segnale**: non contiene i risultati. Il client, ricevutala, legge
-l'esito via TCP (`requestGameInfo(roundId)`/`requestGameStats`). Se la notifica
-arriva prima di `finalizeGame` si apre una finestra TOCTOU: il client deve
-ritentare la lettura dello storico.
+È **solo un segnale**: non contiene i risultati. Lo scheduler esegue prima la
+rotazione, poi invia il datagramma; il `roundId` notificato non è più corrente.
+Il client legge quindi immediatamente l'esito storico completo via TCP
+(`requestGameInfo(roundId)`/`requestGameStats`), senza retry TOCTOU.
 
 ## Collegamenti
 - `network/GameScheduler`: costruisce `new GameEnded("GAME_ENDED", gameId, roundId)`.

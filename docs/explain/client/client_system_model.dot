@@ -1,6 +1,6 @@
 digraph Client {
   rankdir=LR;
-  graph [bgcolor="white", fontname="Inter, Arial, Helvetica, sans-serif", splines=true, dpi=96,
+  graph [bgcolor="white", fontname="Inter, Arial, Helvetica, sans-serif", splines=true, dpi=192,
          nodesep=1.2, ranksep=1.4, pad="0.6,0.6", labeljust="l"];
   node  [fontname="Inter, Arial, Helvetica, sans-serif", shape=box, style="rounded,filled",
          fontsize=12, margin=0.25, height=0, width=0];
@@ -21,7 +21,7 @@ digraph Client {
   subgraph cluster_udp {
     label="THREAD 2 · \"udp\" (1)"; fontsize=13; fontcolor="#075985"; style="rounded,filled";
     fillcolor="#e0f2fe"; color="#0284c7"; padt="+1"; padl="+1"; padr="+1"; padb="+1";
-    UDP  [label="UdpClient (receiver)  NUOVO THREAD\n  DatagramSocket effimero (0)\n  attesa GAME_ENDED\n  → fetch esito via ClientConn",
+    UDP  [label="UdpClient (receiver)  NUOVO THREAD\n  DatagramSocket effimero (0)\n  attesa GAME_ENDED\n  → fetch storico singolo via ClientConn",
           fillcolor="#ffffff", color="#0284c7", fontcolor="#075985"];
   }
 
@@ -37,6 +37,6 @@ digraph Client {
   // ===== archi tra i thread =====
   Main -> UDP [label="new Thread(udp,\"udp\").start()"];
   CLI -> Conn [label="sendAndRetreive()\n(lock condiviso)"];
-  UDP -> Conn [label="sendAndRetreive()\nrequestGameInfo(roundId)\n(stesso lock)"];
+  UDP -> Conn [label="sendAndRetreive()\nrequestGameInfo(roundId)\nstorico subito, no retry\n(stesso lock)"];
   UDP -> CLI [label="Cli.renderGameInfo()\n(statico, stateless)", color="#888888", style=dashed];
 }

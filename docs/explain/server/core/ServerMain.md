@@ -13,7 +13,7 @@ Avvia il server: config → loader → Context → thread di supporto → shutdo
    `udpRegistry`, `notifier`).
 4. **Scheduler**: avvia SOLO `GameScheduler` (thread "scheduler"). **Nessun
    `PersistenceThread`**: la persistenza è event-driven (vedi sotto).
-5. **Shutdown hook**: su SIGTERM/SIGINT salva `users.persist()` +
+5. **Shutdown hook**: su SIGTERM/SIGINT salva `users.persistUsers()` +
    `games.persistHistory()` → nessuna perdita dell'ultima partita finalizzata.
 6. **Acceptor TCP**: pool **on-demand** (`ThreadPoolExecutor`, core 0 → max `cfg.poolSize`,
    keep-alive 10s, `SynchronousQueue`, policy di rifiuto AbortPolicy) +

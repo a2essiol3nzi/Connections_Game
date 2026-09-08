@@ -13,13 +13,13 @@ La base di gran parte dello stato condiviso lato server è `ConcurrentHashMap`.
 - `ActiveGame`: `players` (`ConcurrentHashMap<Integer, PlayerState>`) mappa userId → stato di gioco del giocatore.
 - `UdpRegistry`: `endpoints` (`ConcurrentHashMap<Integer, Endpoint>`) mappa userId → `addr:port` UDP.
 
-**Limite della `ConcurrentHashMap`**: garantisce l'atomicità di ciascuna **singola** operazione (get/put/remove) ma non offre alcuna atomicità **attraverso più strutture**. Quando un'operazione deve modificare coerentemente *due* strutture condivise (per es. aggiungere un utente ad `onlineUsers` e unirlo a `current`), la sola `ConcurrentHashMap` non basta: servono i lock `synchronized` descritti sotto, incluso il lock di metodo su `GameManager`. 
+**Limite della `ConcurrentHashMap`**: garantisce l'atomicità di ciascuna **singola** operazione (get/put/remove) ma non offre alcuna atomicità **attraverso più strutture**. Quando un'operazione deve modificare coerentemente *due* strutture condivise, la sola `ConcurrentHashMap` non basta: servono i lock `synchronized` descritti sotto, incluso il lock di metodo su `GameManager`. 
 
 ### Contatori atomici
 
-- `AtomicInteger`: `UserStore.nextId` genera id utente monotoni; `GameManager.nextRoundId` assegna a ogni partita un `roundId` univoco (che non si ripete al ciclo del loader). Al riavvio `loadHistory()` ricostruisce `nextRoundId` dal massimo roundId dello storico, e `resumeFromRound()` usa quel conteggio per riallineare il ciclo delle partite al punto esatto di interruzione (vedi cap. 1, "Ordinamento delle partite").
-- `AtomicBoolean`: `ActiveGame.finalized` segnala la conclusione della partita. Lettura senza lock (volatile) nelle validazioni; scrittura unica atomica via `compareAndSet(false, true)` in `finalizeGame` per rendere la finalizzazione **idempotente** (solo la prima procede).
-- `volatile`: `GameManager.current` (la partita attiva) è `volatile`; è costruita *prima* dell'assegnazione, quindi le letture senza lock vedono uno stato coerente.
+- `AtomicInteger`: `UserStore.nextId` genera id utente monotoni; `GameManager.nextRoundId` assegna a ogni partita un `roundId` univoco (che non si ripete al ciclo del loader). Al riavvio `loadHistory()` ricostruisce `nextRoundId` dal massimo roundId dello storico (e `resumeFromRound()` lo usa per riallineare il ciclo delle partite).
+- `AtomicBoolean`: `ActiveGame.finalized` segnala la conclusione della partita. Lettura senza lock nelle validazioni; scrittura unica atomica via `compareAndSet(false, true)` in `finalizeGame` per rendere la finalizzazione **idempotente** (solo la prima procede).
+- `volatile`: `GameManager.current` (la partita attiva) è costruita da `makeNext()` prima dell'assegnazione. La write `current = next` è una pubblicazione: nel Java Memory Model essa *happens-before* una successiva read volatile che la osserva, quindi il lettore vede l'oggetto correttamente inizializzato, non "a metà". La lettura lock-free non è però una transazione: concorrendo con `rotate()` può ricevere il vecchio o il nuovo round; l'auto-join avviene dopo lo swap e i dati mutabili usano le proprie primitive (`ConcurrentHashMap`, `AtomicBoolean`, `synchronized(ps)`). In particolare la TOCTOU tra lettura e submit è ammessa, ma sicura: il CAS `finalized` e `finalizeGame` idempotente rifiutano la proposta sul vecchio round. `volatile` non sarebbe sufficiente per proteggere contatori o collezioni mutabili.
 
 ### Lock `synchronized` (lock globale solo dove serve)
 
@@ -34,7 +34,7 @@ L'approccio evita un unico monitor sull'intero server e adotta granularità vari
 
 **Sul singolo `User` (`synchronized(u)`)**, in `UserStore`, i campi mutabili di un account (password, statistiche) sono protetti dal monitor dell'oggetto `User`. Due utenti diversi non si bloccano mai a vicenda. Le operazioni di mappa (`register`, `login`, `getByName`, `updateCredentials`) si appoggiano a `synchronized(this)` sullo store per la fase di lookup/inserzione; l'aggiornamento dei campi avviene sotto `synchronized(u)`.
 
-**Lock dedicato per il disco I/O (`ioLock`)**, sia `UserStore.persist()` sia `GameManager.persistHistory()` scrivono su un **monitor dedicato** (`ioLock`), separato da `this`. Così l'I/O (lento) non blocca register/login o il gameplay; le fonti di persistenza concorrenti si serializzano comunque tra loro su `ioLock`. La scrittura è atomica su file: si scrive su `file.tmp` e poi `Files.move(... ATOMIC_MOVE)`.
+**Lock dedicato per il disco I/O (`ioLock`)**, sia `UserStore.persistUsers()` sia `GameManager.persistHistory()` scrivono su un **monitor dedicato** (`ioLock`), separato da `this`. Così l'I/O (lento) non blocca register/login o il gameplay; le fonti di persistenza concorrenti si serializzano comunque tra loro su `ioLock`. La scrittura è atomica su file: si scrive su `file.tmp` e poi `Files.move(... ATOMIC_MOVE)`.
 
 ### Sincronizzazione della classifica
 
@@ -44,5 +44,5 @@ L'approccio evita un unico monitor sull'intero server e adotta granularità vari
 
 Sul client lo stato condiviso si riduce alla connessione. `ClientConn.sendAndRetreive()` è **`synchronized`**: un unico lock copre scrittura della richiesta e lettura della risposta, così il thread main (CLI) e il thread `udp` (receiver) non intrecciano le righe JSON sul canale TCP.
 
-Il resto dello stato UI (`Cli`) è manipolato solo dal thread main; `UdpClient` non condivide dati con la CLI oltre alla connessione (usa `Cli.renderGameInfo`, statico e stateless). Non esiste quindi altra struttura sincronizzata lato client.
+Il resto dello stato UI (`Cli`) è manipolato solo dal thread main; `UdpClient` non condivide dati con la CLI oltre alla connessione (usa `Cli.renderGameInfo`, statico e stateless). Non esiste quindi nessuna altra struttura sincronizzata lato client.
 

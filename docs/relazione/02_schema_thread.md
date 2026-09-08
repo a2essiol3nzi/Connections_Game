@@ -6,7 +6,7 @@ Le scelte di concorrenza sono separate in due viste indipendenti: il **server**,
 
 Il server attiva quattro gruppi di thread, uno dei quali a cardinalità variabile (il pool).
 
-> Vedere immagine `server_system_model`.
+> Grafico in `server_system_model` (non indispensabile alla comprensione).
 
 ### Thread 1 — `main` (1): wiring e accettazione connessioni
 
@@ -14,21 +14,21 @@ Il thread principale (`server.core.ServerMain.main`) svolge i preparativi di avv
 
 ### Thread 2 — `scheduler` (1): ciclo di gioco
 
-Un singolo thread (`network/GameScheduler`) scandisce la durata della partita. A ogni scadenza esegue: `finalizeGame` (idempotente, una sola finalizzazione), persistenza event-driven di utenti e storico, notifica UDP `notifyEnd` (solo segnale) ai client iscritti, quindi la rotazione alla partita successiva con auto-iscrizione dei giocatori online. Gestisce anche `InterruptedException` ricalcolando la deadline anziché uscire.
+Un singolo thread (`network/GameScheduler`) scandisce la durata della partita. A ogni scadenza esegue: `finalizeGame` (idempotente, una sola finalizzazione), persistenza event-driven di utenti e storico, snapshot dei partecipanti della partita conclusa, quindi la rotazione alla partita successiva con auto-iscrizione dei giocatori online e infine la notifica UDP `notifyEnd` (solo segnale) allo snapshot. L'ordine è intenzionale: quando il client riceve `GAME_ENDED(roundId)`, quel round non è più `current`, perciò la successiva richiesta TCP legge subito lo storico completo (soluzione ed esito), senza retry TOCTOU. Gestisce anche `InterruptedException` ricalcolando la deadline anziché uscire.
 
 ### Thread 3 — shutdown hook (1): chiusura pulita
 
-Registrato tramite `Runtime.addShutdownHook`, si attiva su `SIGTERM`/`SIGINT`. Il suo unico compito è la persistenza finale: salva utenti (`users.persist()`) e storico partite (`persistHistory()`) prima che il processo termini.
+Registrato tramite `Runtime.addShutdownHook`, si attiva su `SIGTERM`/`SIGINT`. Il suo unico compito è la persistenza finale: salva utenti (`users.persistUsers()`) e storico partite (`persistHistory()`) prima che il processo termini (chiususra pulita del server).
 
 ### Thread pool — `N ClientHandler` (da 0 a N, on-demand)
 
-Un `ThreadPoolExecutor` configurato per **non tenere thread inattivi**: core size **0**, massimo **`pool.size`** (default 16, configurabile), keep-alive **10 s**, coda **`SynchronousQueue`**, e una politica di rifiuto **AbortPolicy**. Ogni connessione TCP spawne un worker su richiesta (`pool.submit(new ClientHandler(...))`); se non ci sono client, il pool resta a **zero thread**. I worker idle vengono terminati dopo 10 s di inattività. In saturazione (tutti i `pool.size` worker occupati) la `SynchronousQueue` (queue di capacità 0) non accetta altri task e **`AbortPolicy` rifiuta** il subito, lanciando `RejectedExecutionException`; l'acceptor intercetta l'eccezione e **chiude il socket** della connessione: i task non si accumulano in coda e il client in eccesso viene disconnesso (può ritentare). `N` è quindi sia il massimo dei worker sia il massimo dei client serviti simultaneamente.
+Un `ThreadPoolExecutor` configurato per **non tenere thread inattivi**: core size **0**, massimo **`pool.size`** (default 16, configurabile), keep-alive **10 s**, coda **`SynchronousQueue`**, e una politica di rifiuto **AbortPolicy**. Ogni connessione TCP spawna un worker su richiesta (`pool.submit(new ClientHandler(...))`). In saturazione (tutti i `pool.size` worker occupati) la `SynchronousQueue` (queue di capacità 0, accetta inserimento se è richiesta l'estrazione) non accetta altri task e **`AbortPolicy` rifiuta**, lanciando `RejectedExecutionException`; l'acceptor intercetta l'eccezione e **chiude il socket** della connessione: i task non si accumulano in coda e il client in eccesso viene disconnesso (può ritentare).
 
 ## Lato client
 
 Il client usa esattamente **due thread**.
 
-> Vedere immagine `client_system_model`.
+> Grafico in `client_system_model` (non indispensabile alla comprensione).
 
 ### Thread 1 — `main` (1): avvio e loop CLI
 
@@ -36,7 +36,7 @@ Il thread principale (`client.ClientMain`) carica la configurazione, apre la con
 
 ### Thread 2 — `udp` (1): receiver di notifiche
 
-Un unico thread (`client.UdpClient`, nome `"udp"`) resta in attesa su un `DatagramSocket` per le notifiche asincrone `GAME_ENDED`. All'arrivo richiede l'esito tramite la connessione TCP con retry (anti-TOCTOU) e lo stampa con il renderer condiviso. È separato dal thread main perché `receive()` è bloccante e non deve fermare il loop dei comandi.
+Un unico thread (`client.UdpClient`, nome `"udp"`) resta in attesa su un `DatagramSocket` per le notifiche asincrone `GAME_ENDED`. All'arrivo richiede una sola volta l'esito storico tramite la connessione TCP e lo stampa con il renderer condiviso: lo scheduler ha già ruotato prima dell'invio, quindi il `roundId` della notifica non coincide con la partita corrente.
 
 ## Sincronizzazione tra i thread del client
 

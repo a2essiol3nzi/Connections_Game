@@ -38,8 +38,7 @@ public class ConnectionAcceptor implements Runnable {
                     System.err.println("[Acceptor] pool saturo, rifiuto " + client.getInetAddress());
                     try {
                         client.close();
-                    } catch (IOException ignored) {
-                    }
+                    } catch (IOException ignored) {}
                 }
             }
         } catch (IOException e) {

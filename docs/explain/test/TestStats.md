@@ -16,11 +16,15 @@ durata breve** e ispeziona lo stato dopo ogni round.
   `currentStreak=0`, `winRate=33`, `lossRate=33`, `hist[5]++`.
 
 Verifica anche la **penalità**: cumulativo scala `+6`/gruppo, `-4`/errore.
+Il round 1 verifica inoltre la regressione UDP: riceve `GAME_ENDED` su una
+socket effimera e, immediatamente, richiede quel `roundId`; la risposta deve già
+contenere `assignment` e `outcome` dallo storico.
 
 ## Metodi
 - `run(projectDir)` — avvia server dedicato (`TC.startServer(..., 3)` sec),
   gioca i 3 round, valida le stat, stop in `finally`.
 - `awaitPuzzleCount(TC, n)` — poll finché `puzzlesCompleted>=n`.
+- `awaitGameEnded(DatagramSocket)` — riceve e valida il segnale UDP entro 10 s.
 - `awaitRoundAdvance(TC, prevRoundId)` — attende che la partita corrente sia
   avanzata oltre `prevRoundId` E `finished=false` (necessario: `finalizeGame`
   avanza `puzzlesCompleted` PRIMA di `rotate`, senza questo sync i submit del

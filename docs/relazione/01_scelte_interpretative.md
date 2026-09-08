@@ -4,11 +4,11 @@ Il bando definisce funzionalità e protocollo, ma lascia aperti alcuni vincoli d
 
 ## Metrica della classifica
 
-Il bando richiede una classifica dei giocatori ma non specifica quale valore ordini la graduatoria. È stata scelta la **somma cumulativa dei punteggi di tutte le partite giocate** (`cumulativeScore`), aggiornata a ogni partita conclusa. Un ordine alternativo (es. media, best score, win-rate) avrebbe penalizzato i giocatori meno attivi o premiato il "lotto"; la somma cumulativa è la metrica più semplice e direttamente confrontabile.
+Il bando richiede una classifica dei giocatori ma non specifica quale valore ordini la graduatoria. È stata scelta la **somma cumulativa dei punteggi di tutte le partite giocate** (`cumulativeScore`), aggiornata a ogni partita conclusa. Un ordine alternativo (es. media, best score, win-rate) avrebbe penalizzato i giocatori meno attivi o premiato il "lotto"; la somma cumulativa è la metrica più semplice e sensata.
 
 ## Durata di una partita
 
-Non è fissata dal bando. È **configurabile** tramite `game.duration.sec` in `server.properties` (default 600 s); l'assetto consegnato usa 180 s per permettere più cicli di verifica in tempi brevi. Lo scheduler, scaduto il tempo, finalizza la partita in modo **idempotente** (una sola volta) e procede alla rotazione.
+Non è fissata dal bando. È **configurabile** tramite `game.duration.sec` in `server.properties` (default pensato sarebbe 600 s); l'assetto consegnato usa 180 s per permettere cicli di verifica in tempi brevi. Lo scheduler, scaduto il tempo, finalizza la partita in modo **idempotente** (una sola volta, anche se richiesto più volte) e procede alla rotazione.
 
 ## Passaggio tra una partita e la successiva
 
@@ -42,5 +42,5 @@ La separazione rende i due domini (identità vs. storico) salvabili con frequenz
 
 L'insieme di partite in `games.json` viene servito in **ordine sequenziale ciclico**: il loader non carica il file in memoria ma lo scorre in streaming con `JsonReader` a **memoria O(1)**, ripetendolo ciclicamente all'esaurimento (`CyclicGameIterator`). Questa scelta evita il costo e i problemi di un indice in RAM e rende il file delle partite semplice da mantenere a mano.
 
-La posizione nel ciclo è inoltre **persistita tra i riavvii**. A ogni partita è assegnato un `roundId` monotono, e la sequenza è deterministica (`0..total-1` poi wrap): al boot `GameManager.resumeFromRound()` riallinea l'iteratore a `(nextRoundId-1) % total` (= `roundId % total`, dove `roundId` è il numero di round già giocati, ricostruito da `loadHistory` dal massimo dello storico). Così, dopo uno shutdown e riavvio, si riparte dalla partita **successiva a quella già mostrata**, non dalla prima del file.
+La posizione nel ciclo è inoltre **persistita tra i riavvii**. A ogni partita è assegnato un `roundId` monotono, e la sequenza è deterministica (`0..total-1` poi wrap): al boot `GameManager.resumeFromRound()` riallinea l'iteratore a `(nextRoundId-1) % total` (= `roundId % total`, dove `roundId` è il numero di round già giocati, ricostruito in `loadHistory` dal massimo dello storico). Così, dopo uno shutdown e riavvio, si riparte dalla partita **successiva a quella già mostrata**, non dalla prima del file (non fondamentale ma utile in caso di crash causato volontariamente da utenti malevoli).
 

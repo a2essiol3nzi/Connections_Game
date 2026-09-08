@@ -55,7 +55,7 @@ public class ServerMain {
         // 5) shutdown hook: SIGTERM/SIGINT -> persist prima di uscire (no perdita ultima partita)
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
-                ctx.users.persist();
+                ctx.users.persistUsers();
                 ctx.games.persistHistory();
                 System.out.println("[Server] users + history saved on shutdown");
             } catch (IOException e) {
@@ -66,10 +66,9 @@ public class ServerMain {
         // 6) acceptor TCP sul thread principale
         // Pool a crescita on-demand: core 0 (nessun thread in attesa se non ci sono client),
         // massimo pool.size, thread idle muoiono dopo 10s. SynchronousQueue consegna ogni
-        // task direttamente a un worker (con core 0 una coda unbounded non spawnerebbe mai
-        // thread); in saturazione (tutti i worker occupati) la AbortPolicy RIFIUTA il task
-        // lanciando RejectedExecutionException: l'acceptor chiude la connessione del client
-        // (che si disconnette) invece di accumulare richieste o bloccare.
+        // task direttamente a un worker; in saturazione (tutti i worker occupati) la AbortPolicy 
+        // RIFIUTA il task lanciando RejectedExecutionException: l'acceptor chiude la connessione 
+        // del client (che si disconnette) invece di accumulare richieste o bloccare.
         ThreadPoolExecutor pool = new ThreadPoolExecutor(
                 0, cfg.poolSize,
                 10, TimeUnit.SECONDS,

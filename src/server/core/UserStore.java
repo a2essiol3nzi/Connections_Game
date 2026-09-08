@@ -192,7 +192,7 @@ public class UserStore {
      * concorrenti (timer/scheduler/shutdown) si serializzano ancora tra 
      * loro tramite `ioLock`.
      */
-    public void persist() throws IOException {
+    public void persistUsers() throws IOException {
         JsonArray arr;
         synchronized (this) {
             arr = new JsonArray();
@@ -234,7 +234,7 @@ public class UserStore {
     // l'IOException non deve diventare un codice Errors per il client, quindi la
     // si logga e si prosegue (il shutdown hook / persist seguente recupererà).
     private void persistQuiet() {
-        try { persist(); }
+        try { persistUsers(); }
         catch (IOException e) {
             System.err.println("[UserStore] persist failed: " + e.getMessage());
         }

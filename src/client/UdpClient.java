@@ -17,15 +17,12 @@ import java.nio.charset.StandardCharsets;
  * La porta è EFFIMERA (binding a 0): il valore va inviato al server nel login
  * come `udpPort`. `GAME_ENDED` è SOLO un segnale (gameId/roundId), non contiene
  * i risultati: al suo arrivo si va a leggere l'esito via TCP con
- * requestGameInfo(roundId). Se la notifica arriva prima che il server abbia
- * finalizzato (TOCTOU) la lettura restituisce ERR_GAME_NOT_FOUND: si ritenta 
- * per un numero finito di volte poi si abbandona.
+ * requestGameInfo(roundId). Lo scheduler ruota prima di inviare la notifica,
+ * quindi il round richiesto è già nello storico e la lettura è immediata.
  */
 public class UdpClient implements Runnable, AutoCloseable {
 
     private static final Gson GSON = new Gson();
-    private static final int MAX_RETRY = 10;   // ~2s guida (per TOCTOU-window)
-    private static final long RETRY_DELAY_MS = 200;
 
     private final DatagramSocket sock;
     private final ClientConn conn;
@@ -61,40 +58,27 @@ public class UdpClient implements Runnable, AutoCloseable {
         }
     }
 
-    // Legge l'esito della partita conclusa con retry.
+    // Legge l'esito storico della partita conclusa.
     private void printResult(int roundId) {
         Cli.clearInputLine(); // pulisci stdin di client
         System.out.println("\n[notifica] partita round " + roundId + " terminata - recupero esito...");
         Request req = new Request();
         req.operation = "requestGameInfo";
         req.roundId = roundId;
-        for (int i = 0; i < MAX_RETRY; i++) {
-            try {
-                Response r = conn.sendAndRetreive(req);
-                if ("ERROR".equals(r.status)) {
-                    if ("ERR_GAME_NOT_FOUND".equals(r.errorCode)) {
-                        // storico non ancora finalizzato (TOCTOU)
-                        Thread.sleep(RETRY_DELAY_MS);
-                        continue;
-                    }
-                    System.out.println("\tesito non disponibile: " + r.errorCode);
-                    Cli.printPrompt(); // ridisegna prompt
-                    return;
-                }
-                System.out.println("=== ESITO PARTITA round " + roundId + " ===");
-                Cli.renderGameInfo(GSON.fromJson(GSON.toJson(r.payload), GameInfoPayload.class));
-                System.out.println("========================================");
-                Cli.printPrompt();
-                return;
-            } catch (IOException e) { // per abbandono o altro
-                System.out.println("[udp] connessione TCP chiusa, abbandono");
-                return;
-            } catch (InterruptedException e) { // su sleep
+        try {
+            Response r = conn.sendAndRetreive(req);
+            if ("ERROR".equals(r.status)) {
+                System.out.println("\tesito non disponibile: " + r.errorCode);
+                Cli.printPrompt(); // ridisegna prompt
                 return;
             }
+            System.out.println("┈┈┈ ESITO PARTITA round " + roundId + " ┈┈┈");
+            Cli.renderGameInfo(GSON.fromJson(GSON.toJson(r.payload), GameInfoPayload.class));
+            System.out.println("┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈");
+            Cli.printPrompt();
+        } catch (IOException e) { // per abbandono o altro
+            System.out.println("[udp] connessione TCP chiusa, abbandono");
         }
-        System.out.println("\tesito non ancora pronto dopo " + MAX_RETRY + " tentativi");
-        Cli.printPrompt();
     }
 
     @Override 
