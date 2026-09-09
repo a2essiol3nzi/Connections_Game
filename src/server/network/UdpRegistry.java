@@ -17,6 +17,7 @@ public class UdpRegistry {
         }
     }
     
+    // Map<userId, clientAddress>
     private final Map<Integer, Endpoint> endpoints = new ConcurrentHashMap<>();
     
     // Registra endpoint UDP per un utente online.

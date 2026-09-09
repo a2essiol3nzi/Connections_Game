@@ -14,6 +14,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -56,7 +57,7 @@ public class Cli {
             + "  " + CYAN + "update   " + RESET + "   <oldU> <oldPsw> [newU|-] [newPsw|-]      aggiorna credenziali\n"
             + "  " + CYAN + "login    " + RESET + "   <user> <psw>      accedi (entra nella partita)\n"
             + "  " + CYAN + "logout   " + RESET + "   esci dalla partita\n"
-            + "  " + CYAN + "submit   " + RESET + "   <w1> <w2> <w3> <w4>      invia una proposta di gruppo\n"
+            + "  " + CYAN + "submit   " + RESET + "   <w1> <w2> <w3> <w4>      invia una proposta (es. \"ice cube\")\n"
             + "  " + CYAN + "info     " + RESET + "   [roundId]      stato/esito partita (-1 = corrente)\n"
             + "  " + CYAN + "stats    " + RESET + "   [roundId]      statistiche partita\n"
             + "  " + CYAN + "leaders  " + RESET + "   [ -k N | -name X ]      classifica (default: tutti)\n"
@@ -85,7 +86,11 @@ public class Cli {
     private boolean dispatch(String line) throws IOException {
         if (line.isEmpty()) 
             return true;
-        String[] t = line.split("\\s+"); // spazi bianchi consecutivi (spazio, tab, newline, ecc.)
+        String[] t = tokenize(line);
+        if (t == null) {
+            System.out.println("virgolette non chiuse");
+            return true;
+        }
         // Se già loggati, non si può né registrarsi né rifare login.
         if (loggedIn && (t[0].equals("register") || t[0].equals("login"))) {
             System.out.println(YELLOW + "Già loggato - fai prima logout." + RESET);
@@ -148,6 +153,33 @@ public class Cli {
         Request r = new Request(); 
         r.operation = op; 
         return r; 
+    }
+
+    /* Divide gli argomenti sugli spazi, tranne quelli racchiusi fra virgolette.
+     * Le virgolette non fanno parte del valore inviato al server.
+     */
+    static String[] tokenize(String line) {
+        List<String> tokens = new ArrayList<>();
+        StringBuilder token = new StringBuilder();
+        boolean quoted = false;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '"') {
+                quoted = !quoted;
+            } else if (Character.isWhitespace(c) && !quoted) {
+                if (token.length() > 0) {
+                    tokens.add(token.toString());
+                    token.setLength(0);
+                }
+            } else {
+                token.append(c);
+            }
+        }
+        if (quoted)
+            return null;
+        if (token.length() > 0)
+            tokens.add(token.toString());
+        return tokens.toArray(new String[tokens.size()]);
     }
 
     private static Integer parseId(String[] t, int i) {

@@ -47,14 +47,17 @@ Helper privati:
 Legge righe da stdin; ogni comando ha un handler dedicato `cmd*`:
 - `help` → `printHelp()`.
 - `register <user> <psw>` → `cmdRegister` / `update <oldU> <oldP> [newU|-] [newP|-]` → `cmdUpdate` / `login <user> <psw>` → `cmdLogin` (aggiunge `udpPort`) / `logout` → `cmdLogout`.
-- `submit w1 w2 w3 w4` → `cmdSubmit` → `submitProposal`.
+- `submit w1 w2 w3 w4` → `cmdSubmit` → `submitProposal`. Una parola composta
+  si racchiude tra virgolette: `submit "ice cube" wonder jail sea`.
 - `info [roundId]` → `cmdGameInfo` → `requestGameInfo` (default `-1`).
 - `stats [roundId]` → `cmdGameStats` → `requestGameStats`.
 - `leaders [-k N|-name X]` → `cmdLeaders` → `requestLeaderboard`.
 - `me` → `cmdMe` → `requestPlayerStats`.
 - `quit`/`exit` → termina il loop; altrimenti "Comando sconosciuto".
 
-`parseId` rende `-1` per i default; `-` nelle update indica "non cambiare".
+`tokenize` separa gli argomenti sugli spazi esterni alle virgolette, rimuove le
+virgolette dal valore e rifiuta una riga con virgolette non chiuse. `parseId`
+rende `-1` per i default; `-` nelle update indica "non cambiare".
 
 ## `sendAndRender` + helper `payload`
 `conn.sendAndRetreive(r)`; se `ERROR` stampa in **rosso** `✗ ERRORE

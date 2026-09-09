@@ -4,3 +4,6 @@ dist/*
 
 # dir di config IDE
 .vscode/*
+
+# a caso
+ZIP/
