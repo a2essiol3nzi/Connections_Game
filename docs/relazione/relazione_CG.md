@@ -8,7 +8,7 @@ Il bando richiede una classifica dei giocatori ma non specifica quale valore ord
 
 ## Durata di una partita
 
-Non è fissata dal bando. È **configurabile** tramite `game.duration.sec` in `server.properties` (default pensato sarebbe 600 s); l'assetto consegnato usa 180 s per permettere cicli di verifica in tempi brevi. Lo scheduler, scaduto il tempo, finalizza la partita in modo **idempotente** (una sola volta, anche se richiesto più volte) e procede alla rotazione.
+Non è fissata dal bando. È **configurabile** tramite `game.duration.sec` in `server.properties` (default pensato sarebbe 600 s); l'assetto consegnato usa 180 s per permettere cicli di verifica in tempi brevi. Lo scheduler usa `scheduleWithFixedDelay`: il primo task rispetta `endTimeMs`, mentre i successivi partono dopo `game.duration.sec` dal completamento del task precedente. Lo scheduler finalizza la partita in modo **idempotente** (una sola volta, anche se richiesto più volte) e procede alla rotazione.
 
 ## Passaggio tra una partita e la successiva
 
@@ -60,7 +60,7 @@ Il thread principale (`server.core.ServerMain.main`) svolge i preparativi di avv
 
 ### Thread 2 — `scheduler` (1): ciclo di gioco
 
-Un singolo thread (`network/GameScheduler`) scandisce la durata della partita. A ogni scadenza esegue: `finalizeGame` (idempotente, una sola finalizzazione), persistenza event-driven di utenti e storico, snapshot dei partecipanti della partita conclusa, quindi la rotazione alla partita successiva con auto-iscrizione dei giocatori online e infine la notifica UDP `notifyEnd` (solo segnale) allo snapshot. L'ordine è intenzionale: quando il client riceve `GAME_ENDED(roundId)`, quel round non è più `current`, perciò la successiva richiesta TCP legge subito lo storico completo (soluzione ed esito), senza retry TOCTOU. Gestisce anche `InterruptedException` ricalcolando la deadline anziché uscire.
+Un singolo worker `ScheduledExecutorService` (`network/GameScheduler`) esegue il primo task alla deadline della partita iniziale e poi usa `scheduleWithFixedDelay`: attende `game.duration.sec` dal completamento del task precedente. Il task esegue `finalizeGame` (idempotente, una sola finalizzazione), persistenza event-driven di utenti e storico, snapshot dei partecipanti della partita conclusa, quindi la rotazione alla partita successiva con auto-iscrizione dei giocatori online e infine la notifica UDP `notifyEnd` (solo segnale) allo snapshot. L'ordine è intenzionale: quando il client riceve `GAME_ENDED(roundId)`, quel round non è più `current`, perciò la successiva richiesta TCP legge subito lo storico completo (soluzione ed esito), senza retry TOCTOU. Poiché il delay inizia dopo `notifyEnd`, il lavoro post-rotazione si aggiunge alla durata osservata del nuovo round.
 
 ### Thread 3 — shutdown hook (1): chiusura pulita
 

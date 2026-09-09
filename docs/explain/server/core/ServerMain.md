@@ -11,7 +11,8 @@ Avvia il server: config → loader → Context → thread di supporto → shutdo
    partite non stanno mai tutte in RAM); su errore → `System.exit(3)`.
 3. **Context**: `new Context(cfg, loader)` (risorse condivise: `users`, `games`,
    `udpRegistry`, `notifier`).
-4. **Scheduler**: avvia SOLO `GameScheduler` (thread "scheduler"). **Nessun
+4. **Scheduler**: `GameScheduler.start()` crea un `ScheduledExecutorService` con
+   un worker chiamato "scheduler" e programma la prima scadenza. **Nessun
    `PersistenceThread`**: la persistenza è event-driven (vedi sotto).
 5. **Shutdown hook**: su SIGTERM/SIGINT salva `users.persistUsers()` +
    `games.persistHistory()` → nessuna perdita dell'ultima partita finalizzata.

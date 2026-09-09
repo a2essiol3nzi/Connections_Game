@@ -8,7 +8,7 @@ Il bando richiede una classifica dei giocatori ma non specifica quale valore ord
 
 ## Durata di una partita
 
-Non è fissata dal bando. È **configurabile** tramite `game.duration.sec` in `server.properties` (default pensato sarebbe 600 s); l'assetto consegnato usa 180 s per permettere cicli di verifica in tempi brevi. Lo scheduler, scaduto il tempo, finalizza la partita in modo **idempotente** (una sola volta, anche se richiesto più volte) e procede alla rotazione.
+Non è fissata dal bando. È **configurabile** tramite `game.duration.sec` in `server.properties` (default pensato sarebbe 600 s); l'assetto consegnato usa 180 s per permettere cicli di verifica in tempi brevi. Lo scheduler usa `scheduleWithFixedDelay`: il primo task rispetta `endTimeMs`, mentre i successivi partono dopo `game.duration.sec` dal completamento del task precedente. Lo scheduler finalizza la partita in modo **idempotente** (una sola volta, anche se richiesto più volte) e procede alla rotazione.
 
 ## Passaggio tra una partita e la successiva
 

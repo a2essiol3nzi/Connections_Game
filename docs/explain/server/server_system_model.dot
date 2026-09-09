@@ -20,7 +20,7 @@ digraph Server {
   subgraph cluster_sched {
     label="THREAD 2 · scheduler (1)"; fontsize=13; fontcolor="#92400e"; style="rounded,filled";
     fillcolor="#fdf6e3"; color="#d97706";
-    Sched [label="GameScheduler\nsleep → finalizeGame → persist\n→ rotate → notifier.notifyEnd", fillcolor="#ffffff", color="#d97706", fontcolor="#111827"];
+    Sched [label="GameScheduler\nscheduleWithFixedDelay\n→ finalizeGame → persist\n→ rotate → notifier.notifyEnd", fillcolor="#ffffff", color="#d97706", fontcolor="#111827"];
   }
 
   // ===== THREAD 3 · shutdown hook =====

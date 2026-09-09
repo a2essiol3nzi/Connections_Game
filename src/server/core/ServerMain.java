@@ -50,7 +50,7 @@ public class ServerMain {
         Context ctx = new Context(cfg, loader);
 
         // 4) scheduler partita (persistenza utenti event-driven)
-        new Thread(new GameScheduler(ctx.games, ctx.users, ctx.notifier), "scheduler").start();
+        new GameScheduler(ctx.games, ctx.users, ctx.notifier, cfg.gameDurationSec).start();
 
         // 5) shutdown hook: SIGTERM/SIGINT -> persist prima di uscire (no perdita ultima partita)
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

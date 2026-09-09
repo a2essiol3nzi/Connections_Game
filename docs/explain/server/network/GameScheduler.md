@@ -1,19 +1,24 @@
 # `network/GameScheduler` — scheduler della partita attiva
 
 ## Ruolo
-Unico thread di servizio che gestisce il ciclo di vita della partita: attende
-la scadenza di `current` → finalizza gli esiti → **persist event-driven** (utenti
-+ storico) → ruota alla partita successiva → invia la notifica UDP ai partecipanti
-della partita conclusa.
+Unico worker di un `ScheduledExecutorService` che gestisce il ciclo di vita:
+il primo task attende la deadline di `current`; i successivi attendono il delay
+fisso dalla conclusione del task precedente. Ogni task finalizza gli esiti →
+**persist event-driven** (utenti + storico) → ruota alla partita successiva →
+invia la notifica UDP ai partecipanti della partita conclusa.
 
 ## Campi
 - `gameMan` — `GameManager` (current/rotate/finalize/persistHistory).
 - `users` — `UserStore` (aggiorna statistiche + `persist()`).
 - `notifier` — `UdpNotifier` (notifica fine partita su `Set<Integer>`).
+- `durationMs` — delay fisso tra completamento di un task e inizio del successivo.
+- `executor` — servizio monothread con worker nominato `scheduler`.
 
-## Flusso (`run`, ciclo infinito)
-1. `g = gameMan.current()`; se null → `sleep(1000)`, riprova.
-2. `waitMs = g.endTimeMs - now`; se > 0 → `sleep(waitMs)`.
+## Flusso (`start` → task periodico)
+1. `start()` legge la prima `current` e programma `endCurrentGame()` con
+   `initialDelay = current.endTimeMs - now`.
+2. `scheduleWithFixedDelay` invoca poi il task dopo `durationMs` dal completamento
+   del task precedente.
 3. `gameMan.finalizeGame(users)` — registra esiti + statistiche.
 4. `users.persistUsers()` — persistenza utenti (stats) event-driven post-finalize;
    gestisce `IOException` con log. (Lo storico `gameMan.persistHistory()` è
@@ -30,9 +35,11 @@ della partita conclusa.
 > lo storico completo senza retry.
 
 ## Concorrenza
-Coordinazione via `Thread.sleep` fino a `endTimeMs`; `sleep()` ricalcola il
-deadline ed effettua **retry** su `InterruptedException` (non esce dal ciclo).
-Lo swap di `ActiveGame` in `GameManager.rotate` è `synchronized`.
+Un `ScheduledExecutorService` a un solo worker serializza i task: non esistono
+due `finalizeGame` concorrenti. Il fixed delay parte al completamento del task,
+quindi la porzione successiva a `rotate` (notifica UDP e log) si aggiunge alla
+durata osservata della nuova partita. Lo swap di `ActiveGame` in
+`GameManager.rotate` è `synchronized`.
 `persist()`/`persistHistory()` usano l'`ioLock` dedicato (rispettivamente in
 `UserStore`/`GameManager`) ⇒ serializzati tra loro e con l'event-driven di
 `register`/`updateCredentials` (nessun timer).
