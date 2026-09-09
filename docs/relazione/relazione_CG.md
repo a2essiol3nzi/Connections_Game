@@ -42,7 +42,7 @@ La separazione rende i due domini (identità vs. storico) salvabili con frequenz
 
 L'insieme di partite in `games.json` viene servito in **ordine sequenziale ciclico**: il loader non carica il file in memoria ma lo scorre in streaming con `JsonReader` a **memoria O(1)**, ripetendolo ciclicamente all'esaurimento (`CyclicGameIterator`). Questa scelta evita il costo e i problemi di un indice in RAM e rende il file delle partite semplice da mantenere a mano.
 
-La posizione nel ciclo è inoltre **persistita tra i riavvii**. A ogni partita è assegnato un `roundId` monotono, e la sequenza è deterministica (`0..total-1` poi wrap): al boot `GameManager.resumeFromRound()` riallinea l'iteratore a `(nextRoundId-1) % total` (= `roundId % total`, dove `roundId` è il numero di round già giocati, ricostruito in `loadHistory` dal massimo dello storico). Così, dopo uno shutdown e riavvio, si riparte dalla partita **successiva a quella già mostrata**, non dalla prima del file (non fondamentale ma utile in caso di crash causato volontariamente da utenti malevoli).
+La posizione nel ciclo è inoltre **persistita tra i riavvii**. A ogni partita è assegnato un `roundId` monotono, e la sequenza è deterministica (`0..total-1` poi wrap): al boot `GameManager.resumeFromRound()` riallinea l'iteratore a `(nextRoundId-1) % total` (= `roundId % total`, dove `roundId` è il numero di round già giocati, ricostruito in `loadHistory` dal massimo dello storico). Così, dopo uno shutdown e riavvio, si riparte dalla partita **successiva a quella già mostrata**, non dalla prima del file.
 
 # Schema generale dei thread
 
@@ -60,7 +60,7 @@ Il thread principale (`server.core.ServerMain.main`) svolge i preparativi di avv
 
 ### Thread 2 — `scheduler` (1): ciclo di gioco
 
-Un singolo worker `ScheduledExecutorService` (`network/GameScheduler`) esegue il primo task alla deadline della partita iniziale e poi usa `scheduleWithFixedDelay`: attende `game.duration.sec` dal completamento del task precedente. Il task esegue `finalizeGame` (idempotente, una sola finalizzazione), persistenza event-driven di utenti e storico, snapshot dei partecipanti della partita conclusa, quindi la rotazione alla partita successiva con auto-iscrizione dei giocatori online e infine la notifica UDP `notifyEnd` (solo segnale) allo snapshot. L'ordine è intenzionale: quando il client riceve `GAME_ENDED(roundId)`, quel round non è più `current`, perciò la successiva richiesta TCP legge subito lo storico completo (soluzione ed esito), senza retry TOCTOU. Poiché il delay inizia dopo `notifyEnd`, il lavoro post-rotazione si aggiunge alla durata osservata del nuovo round.
+Un singolo worker `ScheduledExecutorService` (`network/GameScheduler`) esegue il primo task alla deadline della partita iniziale e poi usa `scheduleWithFixedDelay`. Il task esegue `finalizeGame` (idempotente, una sola finalizzazione), persistenza event-driven di utenti e storico, snapshot dei partecipanti della partita conclusa, quindi la rotazione alla partita successiva con auto-iscrizione dei giocatori online e infine la notifica UDP `notifyEnd` (solo segnale) allo snapshot. L'ordine è intenzionale: quando il client riceve `GAME_ENDED(roundId)`, quel round non è più `current`, perciò la successiva richiesta TCP legge subito lo storico completo (soluzione ed esito), senza retry TOCTOU.
 
 ### Thread 3 — shutdown hook (1): chiusura pulita
 
