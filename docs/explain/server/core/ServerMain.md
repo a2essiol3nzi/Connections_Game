@@ -11,20 +11,22 @@ Avvia il server: config → loader → Context → thread di supporto → shutdo
    partite non stanno mai tutte in RAM); su errore → `System.exit(3)`.
 3. **Context**: `new Context(cfg, loader)` (risorse condivise: `users`, `games`,
    `udpRegistry`, `notifier`).
-4. **Scheduler**: `GameScheduler.start()` crea un `ScheduledExecutorService` con
-   un worker chiamato "scheduler" e programma la prima scadenza. **Nessun
+4. **Scheduler**: `GameScheduler` possiede un `ScheduledExecutorService` con
+   worker `scheduler`. `start()` programma la prima scadenza. **Nessun
    `PersistenceThread`**: la persistenza è event-driven (vedi sotto).
-5. **Shutdown hook**: su SIGTERM/SIGINT salva `users.persistUsers()` +
-   `games.persistHistory()` → nessuna perdita dell'ultima partita finalizzata.
-6. **Acceptor TCP**: pool **on-demand** (`ThreadPoolExecutor`, core 0 → max `cfg.poolSize`,
+5. **Acceptor TCP**: pool **on-demand** (`ThreadPoolExecutor`, core 0 → max `cfg.poolSize`,
    keep-alive 10s, `SynchronousQueue`, policy di rifiuto AbortPolicy) +
    `ConnectionAcceptor` sul thread principale (bloccante).
+6. **Shutdown hook**: su SIGTERM/SIGINT chiude acceptor e socket client,
+   ferma/attende scheduler e pool, quindi salva `users.persistUsers()` +
+   `games.persistHistory()`. La persistenza finale non corre contro mutatori.
 
 ## Note
 - **Persistenza event-driven (niente timer)**: i deltas account (register/rename)
   si salvano in `UserStore.register`/`updateCredentials` via `persistQuiet()`; le
   stats/storico li salva lo scheduler post-`finalizeGame`. Il solo shutdown hook
-  copre l'ultima partita finalizzata all'uscita.
+  copre l'ultima partita finalizzata all'uscita, dopo l'arresto ordinato di
+  scheduler, acceptor e pool.
 - Pool size = numero massimo di connessioni/concorrenti servite
   contemporaneamente (una connessione persistente occupa un thread).
 

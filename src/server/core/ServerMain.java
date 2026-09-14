@@ -50,10 +50,27 @@ public class ServerMain {
         Context ctx = new Context(cfg, loader);
 
         // 4) scheduler partita (persistenza utenti event-driven)
-        new GameScheduler(ctx.games, ctx.users, ctx.notifier, cfg.gameDurationSec).start();
+        GameScheduler scheduler = new GameScheduler(ctx.games, ctx.users, ctx.notifier, cfg.gameDurationSec);
 
-        // 5) shutdown hook: SIGTERM/SIGINT -> persist prima di uscire (no perdita ultima partita)
+        // 5) acceptor TCP sul thread principale
+        // Pool a crescita on-demand: core 0 (nessun thread in attesa se non ci sono client),
+        // massimo pool.size, thread idle muoiono dopo 10s. SynchronousQueue consegna ogni
+        // task direttamente a un worker; in saturazione (tutti i worker occupati) la AbortPolicy 
+        // RIFIUTA il task lanciando RejectedExecutionException: l'acceptor chiude la connessione 
+        // del client (che si disconnette) invece di accumulare richieste o bloccare.
+        ThreadPoolExecutor pool = new ThreadPoolExecutor(
+            0, cfg.poolSize,
+            10, TimeUnit.SECONDS,
+            new SynchronousQueue<>(),
+            new ThreadPoolExecutor.AbortPolicy()
+        );
+        ConnectionAcceptor acceptor = new ConnectionAcceptor(cfg.tcpPort, pool, ctx);
+
+        // 6) shutdown hook: ferma prima tutti i mutatori, poi salva uno stato stabile.
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            acceptor.shutdown();
+            scheduler.shutdown();
+            shutdownPool(pool);
             try {
                 ctx.users.persistUsers();
                 ctx.games.persistHistory();
@@ -61,21 +78,21 @@ public class ServerMain {
             } catch (IOException e) {
                 System.err.println("[Server] shutdown persist failed: " + e.getMessage());
             }
-        }));
+        }, "shutdown-hook"));
 
-        // 6) acceptor TCP sul thread principale
-        // Pool a crescita on-demand: core 0 (nessun thread in attesa se non ci sono client),
-        // massimo pool.size, thread idle muoiono dopo 10s. SynchronousQueue consegna ogni
-        // task direttamente a un worker; in saturazione (tutti i worker occupati) la AbortPolicy 
-        // RIFIUTA il task lanciando RejectedExecutionException: l'acceptor chiude la connessione 
-        // del client (che si disconnette) invece di accumulare richieste o bloccare.
-        ThreadPoolExecutor pool = new ThreadPoolExecutor(
-                0, cfg.poolSize,
-                10, TimeUnit.SECONDS,
-                new SynchronousQueue<>(),
-                new ThreadPoolExecutor.AbortPolicy());
-        ConnectionAcceptor acceptor = new ConnectionAcceptor(cfg.tcpPort, pool, ctx);
+        scheduler.start();
         System.out.println("[Server] listening on TCP " + cfg.tcpPort + " (UDP " + cfg.udpPort + ")");
         acceptor.run();
+    }
+
+    // I socket sono già chiusi dall'acceptor, quindi gli handler bloccati su readLine()
+    // escono; attende che nessuno modifichi lo stato durante la persistenza finale.
+    private static void shutdownPool(ThreadPoolExecutor pool) {
+        pool.shutdown();
+        try {
+            pool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

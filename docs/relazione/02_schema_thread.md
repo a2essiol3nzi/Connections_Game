@@ -18,7 +18,11 @@ Un singolo worker `ScheduledExecutorService` (`network/GameScheduler`) esegue il
 
 ### Thread 3 — shutdown hook (1): chiusura pulita
 
-Registrato tramite `Runtime.addShutdownHook`, si attiva su `SIGTERM`/`SIGINT`. Il suo unico compito è la persistenza finale: salva utenti (`users.persistUsers()`) e storico partite (`persistHistory()`) prima che il processo termini (chiususra pulita del server).
+Registrato tramite `Runtime.addShutdownHook`, si attiva su `SIGTERM`/`SIGINT`.
+Prima chiude il listener e i socket client, poi arresta e attende lo scheduler e
+il pool; infine salva utenti (`users.persistUsers()`) e storico
+(`persistHistory()`). Così nessun handler o `endCurrentGame()` modifica lo stato
+mentre viene scritto lo snapshot finale.
 
 ### Thread pool — `N ClientHandler` (da 0 a N, on-demand)
 

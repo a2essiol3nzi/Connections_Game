@@ -27,6 +27,12 @@ invia la notifica UDP ai partecipanti della partita conclusa.
 6. `gameMan.rotate(now)` — nuova partita (auto-join degli `onlineUsers`).
 7. `notifier.notifyEnd(parts, {type:"GAME_ENDED", gameId, roundId})`.
 
+## Arresto
+`shutdown()` impedisce altre scadenze e attende l'eventuale task in corso senza
+interromperlo: la sequenza `finalize → persist → rotate → notify` deve restare
+atomica rispetto alla persistenza finale. `ServerMain` lo invoca prima dello
+snapshot conclusivo, quindi questo non concorre con `endCurrentGame()`.
+
 > **Semantica UDP**: la notifica è un *segnale* (gameId/roundId), NON contiene
 > i risultati. Il client, ricevutala, legge l'esito via TCP
 > (`requestGameInfo(roundId)` / `requestGameStats`) attingendo dallo storico

@@ -56,6 +56,20 @@ public class GameScheduler {
         );
     }
 
+    /**
+     * Ferma le scadenze future e attende l'eventuale finalizzazione in corso.
+     * Non interrompe il task: deve completare atomicamente la sequenza
+     * finalize -> persist -> rotate -> notify prima della persistenza finale.
+     */
+    public void shutdown() {
+        executor.shutdown();
+        try {
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     // Finalizza il round corrente e crea quello successivo prima della notifica UDP.
     private void endCurrentGame() {
         ActiveGame g = gameMan.current();

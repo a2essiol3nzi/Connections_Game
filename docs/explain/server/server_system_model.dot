@@ -27,7 +27,7 @@ digraph Server {
   subgraph cluster_hook {
     label="THREAD 3 · shutdown hook (1)"; fontsize=13; fontcolor="#92400e"; style="rounded,filled";
     fillcolor="#fdf6e3"; color="#d97706";
-    Hook [label="ShutdownHook (JVM)\nSIGTERM/SIGINT\nusers.persistUsers() + persistHistory()", fillcolor="#ffffff", color="#d97706", fontcolor="#111827"];
+    Hook [label="ShutdownHook (JVM)\nSIGTERM/SIGINT\nstop acceptor → scheduler → pool\nwait → persist users + history", fillcolor="#ffffff", color="#d97706", fontcolor="#111827"];
   }
 
   // ===== THREAD POOL: N ClientHandler (on-demand) =====
@@ -61,6 +61,9 @@ digraph Server {
   Sched  -> Notif [label="notifyEnd(snapshot parts)\nDOPO rotate"];
   Hook   -> Store [label="persistUsers()"];
   Hook   -> GM    [label="persistHistory()"];
+  Hook   -> Accept [label="close listener + client socket", style=dashed];
+  Hook   -> Sched  [label="shutdown + await", style=dashed];
+  Hook   -> Pool   [label="shutdown + await", style=dashed];
 
   // ===== notifier: usa registry =====
   Notif -> Reg [label="getEndpoint()"];

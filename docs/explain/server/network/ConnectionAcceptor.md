@@ -9,6 +9,8 @@ line-based JSON).
 - `port` — porta di listen (da `ServerConfig.tcpPort`).
 - `pool` — `ThreadPoolExecutor` (da `ServerMain`, `cfg.poolSize`).
 - `ctx` — `Context` condiviso (incluso `udpRegistry`).
+- `clients` — socket accettati, per sbloccare i worker in shutdown.
+- `serverSocket` / `shuttingDown` — listener pubblicato e flag di chiusura.
 
 ## Metodo principale
 - `run()` — apre `ServerSocket(port)`, ciclo `accept()` infinito; ad ogni `Socket`
@@ -17,7 +19,10 @@ line-based JSON).
     `RejectedExecutionException`; l'acceptor la intercetta, logga
     `[Acceptor] pool saturo, rifiuto <IP>` e **chiude il socket** → il client
     viene disconnesso (non accumula task in coda, può ritentare).
-  - Su `IOException` stampa e termina il processo.
+  - Su `IOException` inattesa stampa e termina il processo; quella causata da
+    `shutdown()` è attesa e chiude il loop senza errore.
+- `shutdown()` chiude listener e socket client: sblocca sia `accept()` sia le
+  `readLine()` degli handler, poi il pool può terminare prima della persistenza.
 
 ## Concorrenza
 Il ciclo `accept` gira sul **thread principale** (`ServerMain`). Ogni connessione
