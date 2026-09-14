@@ -27,11 +27,11 @@ public class UdpNotifier {
     // dipende dal formato specifico della notifica.
     public void notifyEnd(Set<Integer> participants, Object payload) {
         byte[] data = GSON.toJson(payload).getBytes(StandardCharsets.UTF_8);
-        // Un solo socket UDP riusato per tutti i destinatari (il `connect` ne
-        // ridefinisce il remoto prima di ogni send). `connect` rende il send
-        // non bloccante verso host irraggiungibili (PortUnreachableException
-        // immediata invece del timeout OS).
+        // Payload e un solo DatagramPacket riusati per tutti i destinatari:
+        // per ogni endpoint si aggiorna solo la destinazione. UDP non attende
+        // conferme dal destinatario.
         try (DatagramSocket sock = new DatagramSocket()) {
+            DatagramPacket pkt = new DatagramPacket(data, data.length);
             for (int userId : participants) {
                 Object[] ep = registry.getEndpoint(userId);
                 if (ep == null) {
@@ -40,10 +40,14 @@ public class UdpNotifier {
                 }
                 InetAddress addr = (InetAddress) ep[0];
                 int port = (Integer) ep[1];
-                sock.connect(addr, port);
-                DatagramPacket pkt = new DatagramPacket(data, data.length, addr, port);
-                sock.send(pkt);
-                System.out.println("[UdpNotifier] Notified userId " + userId + " at " + addr.getHostAddress() + ":" + port);
+                pkt.setAddress(addr);
+                pkt.setPort(port);
+                try {
+                    sock.send(pkt);
+                    System.out.println("[UdpNotifier] Notified userId " + userId + " at " + addr.getHostAddress() + ":" + port);
+                } catch (IOException e) {
+                    System.err.println("[UdpNotifier] Failed to notify userId " + userId + ": " + e.getMessage());
+                }
             }
         } catch (IOException e) {
             System.err.println("[UdpNotifier] Failed to notify: " + e.getMessage());

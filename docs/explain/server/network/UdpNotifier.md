@@ -10,14 +10,15 @@ Invia ai partecipanti, via UDP, la notifica di fine partita (§2.2, §3):
 - `GSON` — serializzazione payload.
 
 ## Metodo principale
-- `notifyEnd(Set<Integer> participants, JsonObject payload)` — serializza il
+- `notifyEnd(Set<Integer> participants, Object payload)` — serializza il
   payload; apre **UN SOLO** `DatagramSocket` riusato per tutti i destinatari.
-  Per ogni `userId` recupera l'endpoint dal registry (salta se assente),
-  `sock.connect(addr, port)` ridefinisce il remoto, poi `send(pkt)`. Il
-  `try/catch(IOException)` è **esterno** al loop (errore di apertura socket),
-  così un fallimento verso un host irraggiungibile non interrompe gli altri
-  (`connect` rende il `send` non bloccante: `PortUnreachableException` immediata
-  invece del timeout OS).
+  Riusa anche il payload e **UN SOLO** `DatagramPacket`: per ogni `userId`
+  con endpoint valido aggiorna soltanto la destinazione (`addr` e `port`) e lo
+  invia, senza chiamare `connect`. UDP non attende conferme e non garantisce la
+  consegna. Il `try/catch(IOException)` esterno gestisce il ciclo di vita del
+  socket; ogni `send` e il relativo log di successo hanno un `try/catch`
+  per-destinatario: un fallimento viene loggato con il `userId` e non impedisce
+  i tentativi verso gli endpoint successivi.
 
 ## Note
 Endpoint ricavato lato server: IP dal socket TCP + port fornito dal client al
