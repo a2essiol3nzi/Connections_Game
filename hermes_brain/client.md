@@ -30,7 +30,7 @@
 host=localhost
 port=12345
 ```
-(UDP port NON in config: è l'effimera del socket receiver, mandata a runtime nel login.)
+(UDP port NON in config e non sul server: è l'effimera del socket receiver, mandata a runtime nel login.)
 
 ## Payload che il client deve rendere (da GameManager.java)
 - **login/requestGameInfo(corrente)** → `{gameId, sourceGameId, remainingSec, correct, errors, score, finished, remainingWords[16-ok]}`. Render board: 16 parole in griglia + errore/score.

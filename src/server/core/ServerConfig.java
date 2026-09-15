@@ -8,7 +8,6 @@ import java.util.Properties;
 public class ServerConfig {
 
     public final int tcpPort;
-    public final int udpPort;
     public final int gameDurationSec;
     public final int poolSize;
     public final String gamesFile;
@@ -17,7 +16,6 @@ public class ServerConfig {
 
     private ServerConfig(Properties p) {
         tcpPort = Integer.parseInt(p.getProperty("tcp.port", "12345"));
-        udpPort = Integer.parseInt(p.getProperty("udp.port", "12346"));
         gameDurationSec = Integer.parseInt(p.getProperty("game.duration.sec", "600"));
         poolSize = Integer.parseInt(p.getProperty("pool.size", "16"));
         gamesFile = p.getProperty("games.file", "data/games.json");

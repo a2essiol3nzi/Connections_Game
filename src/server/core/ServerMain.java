@@ -81,7 +81,7 @@ public class ServerMain {
         }, "shutdown-hook"));
 
         scheduler.start();
-        System.out.println("[Server] listening on TCP " + cfg.tcpPort + " (UDP " + cfg.udpPort + ")");
+        System.out.println("[Server] listening on TCP " + cfg.tcpPort);
         acceptor.run();
     }
 

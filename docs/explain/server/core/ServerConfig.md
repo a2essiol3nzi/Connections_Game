@@ -8,7 +8,6 @@ NO interattivo). I campi sono `public final` e immutabili dopo la lettura.
 | Campo | Tipo | Default | Significato |
 |-------|------|---------|-------------|
 | `tcpPort` | int | `12345` | porta accept TCP |
-| `udpPort` | int | `12346` | porta notifiche UDP |
 | `gameDurationSec` | int | `600` | durata partita (10 min) |
 | `poolSize` | int | `16` | thread pool acceptor |
 | `gamesFile` | String | `data/games.json` | file partite (array JSON) |
@@ -27,3 +26,8 @@ condivisa `final` tra tutti i componenti via `Context`.
 ## Collegamenti
 - `core/ServerMain`: unico chiamante di `load`.
 - `core/Context`: riceve l'istanza e la propaga a store/manager/notifier/registry.
+
+## UDP
+Il server non possiede una porta UDP configurabile né apre un listener UDP.
+Ogni endpoint di notifica è l'IP del socket TCP del client più la porta UDP
+effimera inviata dal client nel `login`.

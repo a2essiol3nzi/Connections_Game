@@ -29,6 +29,8 @@ Avvia il server: config → loader → Context → thread di supporto → shutdo
   scheduler, acceptor e pool.
 - Pool size = numero massimo di connessioni/concorrenti servite
   contemporaneamente (una connessione persistente occupa un thread).
+- Il server annuncia e ascolta solo la porta TCP configurata. Le notifiche UDP
+  unicast usano gli endpoint effimeri che i client registrano durante il login.
 
 ## Collegamenti
 - `core/ServerConfig`, `core/Context`, `core/GameManager`, `core/UserStore`.

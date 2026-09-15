@@ -12,7 +12,6 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.ServerSocket;
-import java.net.DatagramSocket;
 import java.util.List;
 
 /**
@@ -117,22 +116,14 @@ public final class TC implements AutoCloseable {
         }
     }
 
-    private static int freeUdpPort() throws IOException {
-        try (DatagramSocket s = new DatagramSocket(0)) { 
-            return s.getLocalPort(); 
-        }
-    }
-
     // Avvia il server su una config temporanea. Ritorna handle con proc+porta.
     public static Server startServer(String projectDir, int gameDurationSec) throws IOException, InterruptedException {
         int tcp = freeTcpPort();
-        int udp = freeUdpPort();
         String tmp = "/tmp/conn_test_" + System.nanoTime();
         new java.io.File(tmp).mkdirs();
         String cfgFile = tmp + "/server.properties";
         try (BufferedWriter w = new BufferedWriter(new FileWriter(cfgFile))) {
             w.write("tcp.port=" + tcp + "\n");
-            w.write("udp.port=" + udp + "\n");
             w.write("game.duration.sec=" + gameDurationSec + "\n");
             w.write("pool.size=16\n");
             w.write("games.file=" + projectDir + "/data/games.json\n");

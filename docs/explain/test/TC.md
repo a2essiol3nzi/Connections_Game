@@ -4,7 +4,7 @@
 Wrapper su `client.ClientConn` per parlare al protocollo. Espone metodi
 tipizzati per le **9 operazioni** e la riconversione `payload → POJO` (stesso
 pattern del client reale: `Gson.fromJson(toJson(payload), Cls)`). Fornisce
-anche `startServer()` per avviare il server su config temporanea (porte alte +
+anche `startServer()` per avviare il server su config temporanea (porta TCP alta +
 file persist/history in `/tmp`) così i test NON toccano `data/users.json` di
 produzione.
 
@@ -20,8 +20,8 @@ e chiamano `conn.sendAndRetreive`. `gameInfo`/`gameStats` impostano `r.roundId`
 `protocol.payload.*`).
 
 ## `startServer(projectDir, gameDurationSec)` — boot server temp
-1. Porte TCP/UDP **libere** (`ServerSocket(0)`/`DatagramSocket(0)`).
-2. Scrive `server.properties` temp con porte + `games.file` (produzione) e
+1. Porta TCP **libera** (`ServerSocket(0)`).
+2. Scrive `server.properties` temp con la porta TCP + `games.file` (produzione) e
    `persist`/`history` in `/tmp/conn_test_*`.
 3. Avvia `server.core.ServerMain` senza argomenti, con classpath assoluto e CWD
    nella directory temporanea: il server legge il `server.properties` appena scritto.
