@@ -10,9 +10,11 @@ esegue una round-trip scrivendo la richiesta e leggendo la riga-risposta.
   `sel.select()`).
 - `sel`, `key` — `Selector` e `SelectionKey` (OP_READ all'avvio, OP_WRITE solo
   durante la scrittura).
-- `net` — `ByteBuffer` da 64 KiB (accumulatore di lettura Ctrl-giro).
-- `lineBuf` — `StringBuilder` cheaccumula il contenuto tra `\n` (read non
-  bloccanti possono restituire mezzi righe).
+- `netBuff` — `ByteBuffer` heap da 64 KiB, riusato per ogni `read()`.
+- `lineBytes` — accumulatore di byte della riga parziale; la conversione UTF-8
+  avviene solo dopo `\n`, quindi un carattere multibyte diviso fra due `read()`
+  resta integro.
+- `pendingLines` — coda delle righe complete già lette nello stesso `read()`.
 
 ## Metodo principale
 - `Response sendAndRetreive(Request req)` — **`synchronized`**: un unico lock
@@ -25,9 +27,11 @@ esegue una round-trip scrivendo la richiesta e leggendo la riga-risposta.
   l'interesse WRITE non resta attivo — un SocketChannel è (quasi) sempre
   scrivibile, quindi un `select()` rientrerebbe subito e `readLine()` andrebbe in
   busy-spin (100% CPU) invece di attendere la risposta.
-- `readLine()` (priv) — accumula fino al primo `\n` da `lineBuf`; se manca,
-  legge dal canale (non bloccante, `0`→`sel.select()`); restituisce `Response`.
-  `read()<0` ⇒ `IOException("server chiuso")`.
+- `readLine()` (priv) — accumula byte fino a `\n`, decodifica allora la riga
+  UTF-8 e restituisce `Response`; conserva in `pendingLines` eventuali righe
+  successive già ricevute. Se manca il delimitatore legge dal canale (non
+  bloccante, `0`→`sel.select()`); oltre 64 KiB senza newline lancia
+  `IOException`. `read()<0` ⇒ `IOException("server chiuso")`.
 - `close()` — chiude canale e selector.
 
 ## Concorrenza

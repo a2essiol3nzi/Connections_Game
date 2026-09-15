@@ -52,7 +52,7 @@ me                   # requestPlayerStats
 Login = invio `login` con `udpPort` = port del receiver (mandato nel JSON, NON nel file).
 
 ## Insidie client
-1. **NIO mono-legge**: il receiver UDP è UN thread separato; `ClientConn.send` è `synchronized` sul canale per non intrecciare righe. Non usare `Selector` per UDP.
+1. **NIO mono-legge e framing byte**: il receiver UDP è UN thread separato; `ClientConn.send` è `synchronized` sul canale per non intrecciare righe. La risposta resta in byte fino a `\n`: non convertire ogni singolo `read()` in `String`, perché UTF-8 può essere spezzato. Non usare `Selector` per UDP.
 2. **UDP bound prima del login**: bind effimero a bootstrap, terza alla connessione server.
 3. **GAME_ENDED è solo un segnale** → il server ruota prima di inviarlo; il relativo `roundId` risolve subito nello storico completo. Segnale ignorato se no ID / no loggato.
 4. **Reorder/firewlen**: `reuseAddress` così da poter riscoltare dopo logout; socket UDP non usato dal server dopo logout.

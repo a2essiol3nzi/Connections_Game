@@ -12,10 +12,12 @@ le suite funzionale e di carico, arresta il server. Exit `0` se tutto verde,
 3. `runFunc` (asser salvo `--load`) → `TestFunc.run(tcpPort)`.
 4. `runLoad` (assen salvo `--func`) → `TestLoad.run(tcpPort)`.
 5. `finally`: `srv.stop()` (arresto server).
-6. `TestStats.run(proj)` — server **dedicato con durata breve** (rotazione
+6. `TestClientConn.run()` — server TCP locale che divide il carattere UTF-8
+   `€` fra due invii, per verificare il framing del client.
+7. `TestStats.run(proj)` — server **dedicato con durata breve** (rotazione
    rapida) per testare stat a fine round.
-7. `TestLoader.run(proj)` — robustezza `GameLoader` (unit, nessun server).
-8. Exit: `code == 0 ? 0 : 1`.
+8. `TestLoader.run(proj)` — robustezza `GameLoader` (unit, nessun server).
+9. Exit: `code == 0 ? 0 : 1`.
 
 ## Args
 - `--load` ⇒ salta funzionale (solo carico).
@@ -23,4 +25,4 @@ le suite funzionale e di carico, arresta il server. Exit `0` se tutto verde,
 
 ## Collegamenti
 - `TC.startServer`: boot del server temp.
-- `TestFunc`, `TestLoad`, `TestStats`, `TestLoader`: suite eseguite.
+- `TestFunc`, `TestLoad`, `TestClientConn`, `TestStats`, `TestLoader`: suite eseguite.

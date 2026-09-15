@@ -29,6 +29,8 @@ public class RunAll {
             System.out.println("\n[teardown] arresto server ...");
             srv.stop();
         }
+        System.out.println("\n[client] TestClientConn: framing TCP");
+        code += TestClientConn.run();
         // TestStats usa un server dedicato con durata di partita BREVE (rotazione rapida)
         System.out.println("\n[stats] TestStats: server dedicato (durata breve)");
         code += TestStats.run(proj);

@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import protocol.Request;
 import protocol.Response;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -11,6 +12,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 
 /**
  * Connessione TCP persistente lato client in NIO (SocketChannel + Selector).
@@ -28,7 +30,8 @@ public class ClientConn implements AutoCloseable {
     private final Selector sel;
     private final SelectionKey key;
     private final ByteBuffer netBuff = ByteBuffer.allocate(BUF_CAP); // buffer di lettura, 64KiB
-    private final StringBuilder lineBuf = new StringBuilder(); // accumulatore righe a cavallo di più read
+    private final ByteArrayOutputStream lineBytes = new ByteArrayOutputStream();
+    private final ArrayDeque<String> pendingLines = new ArrayDeque<>();
 
     public ClientConn(String host, int port) throws IOException {
         sel = Selector.open();
@@ -45,8 +48,9 @@ public class ClientConn implements AutoCloseable {
 
     /**
      * Invia una richiesta e legge la riga-risposta corrispondente.
-     * Scrive e legge in un'unica regione critica, quindi il request/response 
-     * è atomico rispetto agli altri chiamanti (thread CLI + fetch UDP su stesso). 
+     * Scrive e legge in un'unica regione critica, quindi il request/response
+     * è atomico rispetto agli altri chiamanti che condividono lo stesso ClientConn
+     * (thread CLI + fetch UDP).
      * Senza questo lock due chiamate concorrenti mescolerebbero le righe JSON sul canale.
      */
     public synchronized Response sendAndRetreive(Request req) throws IOException {
@@ -75,19 +79,15 @@ public class ClientConn implements AutoCloseable {
     }
 
     /**
-     * Legge dal canale finché nel buffer di ricostruzione non compare un `\n`.
+     * Legge dal canale finché non riceve una riga terminata da `\n`.
      * Poiché il canale è non bloccante, i singoli read possono restituire 0 (niente
-     * ancora disponibile) o frammenti parziali di riga: questi vengono accumulati in
-     * lineBuf tra una chiamata e la successiva.
+     * ancora disponibile) o frammenti parziali di riga. La riga resta in byte fino
+     * al delimitatore: così un carattere UTF-8 diviso tra due read non viene corrotto.
      */
     private Response readLine() throws IOException {
         while (true) {
-            int nl = lineBuf.indexOf("\n");
-            if (nl >= 0) {
-                String line = lineBuf.substring(0, nl);
-                lineBuf.delete(0, nl + 1);
-                return GSON.fromJson(line, Response.class);
-            }
+            if (!pendingLines.isEmpty())
+                return GSON.fromJson(pendingLines.remove(), Response.class);
             netBuff.clear(); // per scrivere nel buff
             int n = chan.read(netBuff);
             if (n < 0)
@@ -97,9 +97,17 @@ public class ClientConn implements AutoCloseable {
                 continue;
             }
             netBuff.flip(); // per leggere dal buff
-            byte[] b = new byte[netBuff.remaining()];
-            netBuff.get(b);
-            lineBuf.append(new String(b, StandardCharsets.UTF_8));
+            while (netBuff.hasRemaining()) {
+                byte b = netBuff.get();
+                if (b == '\n') {
+                    pendingLines.add(new String(lineBytes.toByteArray(), StandardCharsets.UTF_8));
+                    lineBytes.reset();
+                } else {
+                    if (lineBytes.size() == BUF_CAP)
+                        throw new IOException("risposta oltre " + BUF_CAP + " byte senza newline");
+                    lineBytes.write(b);
+                }
+            }
         }
     }
 
