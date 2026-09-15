@@ -19,7 +19,7 @@
 ## CLIENT
 | ID | Componente | Stato | Note |
 |----|-----------|-------|------|
-| C1 | Client NIO (`client.ClientConn`) | 🟢 | `SocketChannel`+`Selector`; `send()` **synchronized** serializza righe; framing UTF-8 su byte fino a `\n` (carattere multibyte fra read preservato), limite 64 KiB/riga |
+| C1 | Client NIO (`client.ClientConn`) | 🟢 | `SocketChannel` bloccante + `ByteBuffer`; framing UTF-8 raw fino a newline; `send()` **synchronized** serializza round-trip JSON |
 | C2 | Client UDP (`client.UdpClient`) | 🟢 | bind effimera (porta nel login); `GAME_ENDED`→singolo fetch TCP dello storico già stabile |
 | C3 | Client CLI (`client.Cli`+`ClientMain`) | 🟢 | 9 op + render; board/risultati/stats; payload riconvertiti in **POJO** (`protocol/payload`) via `Cli.payload(res,Class)` |
 | C4 | Client config (`client.ClientConfig`+`client.properties`) | 🟢 | `host`+`port`; UDP effimera |

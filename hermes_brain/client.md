@@ -2,7 +2,7 @@
 
 ## Framework (da §3, ordinamento NUOVO)
 - Java `javac`; CLI (GUI non valutata → skippata).
-- **NIO** obbligatorio sul TCP (`SocketChannel`+`Selector`).
+- **NIO** sul TCP (`SocketChannel` bloccante, senza `Selector`).
 - UDP: receiver di notifiche async `GAME_ENDED` (unicast da server).
 - Messaggi JSON line-based `\n`, envelope server già fermo:
   - OK:    `{"status":"OK","payload":{...}}`
@@ -21,7 +21,7 @@
 |--------|-------|
 | `ClientMain` | `main` (vincolo §4 naming). Carica `ClientConfig`, avvia receiver? No: il socket UDP va bindato PRIMA del login (serve port). Order: create UdpReceiver (bind) → conn NIO → CLI loop |
 | `ClientConfig` | legge `client.properties` → `host`, `tcpPort`. UDP port auto (effimera) |
-| `ClientConn` (NIO) | `SocketChannel`+`Selector`. `send(Request)->Response` **synchronized(conn)**: scrive JSON+`\n`, leggi riga-risposta. Usato da CLI loop + da UdpReceiver |
+| `ClientConn` (NIO) | `SocketChannel` bloccante con `ByteBuffer`. `send(Request)->Response` **synchronized(conn)**: scrive JSON+`\n`, legge byte fino a riga-risposta. Usato da CLI loop + da UdpReceiver |
 | `UdpClient` | bind a port effimera su localhost; thread in ascolto. Su `GAME_ENDED{roundId}` → un solo `requestGameInfo(roundId)` via `ClientConn`: lo scheduler ha già ruotato e il round è storico. Se non loggato ignora |
 | `Cli` | loop stdin: parse comando → Request → render payload. |
 
@@ -52,7 +52,7 @@ me                   # requestPlayerStats
 Login = invio `login` con `udpPort` = port del receiver (mandato nel JSON, NON nel file).
 
 ## Insidie client
-1. **NIO mono-legge e framing byte**: il receiver UDP è UN thread separato; `ClientConn.send` è `synchronized` sul canale per non intrecciare righe. La risposta resta in byte fino a `\n`: non convertire ogni singolo `read()` in `String`, perché UTF-8 può essere spezzato. Non usare `Selector` per UDP.
+1. **Round-trip serializzata e framing UTF-8**: il receiver UDP è UN thread separato; `ClientConn.send` è `synchronized` sul canale per non intrecciare righe. Accumulare byte fino a `\n` prima di decodificare UTF-8: un carattere multibyte può essere diviso tra read TCP.
 2. **UDP bound prima del login**: bind effimero a bootstrap, terza alla connessione server.
 3. **GAME_ENDED è solo un segnale** → il server ruota prima di inviarlo; il relativo `roundId` risolve subito nello storico completo. Segnale ignorato se no ID / no loggato.
 4. **Reorder/firewlen**: `reuseAddress` così da poter riscoltare dopo logout; socket UDP non usato dal server dopo logout.

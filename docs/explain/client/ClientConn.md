@@ -1,38 +1,32 @@
-# `ClientConn` — connessione TCP persistente NIO
+# `ClientConn` — connessione TCP persistente NIO bloccante
 
 ## Ruolo
-Connessione **NIO** (requisito §3): `SocketChannel` in **modalità non bloccante**
-+ `Selector`. Il server usa una riga JSON per ogni risposta (`\n`); `send()`
-esegue una round-trip scrivendo la richiesta e leggendo la riga-risposta.
+Connessione **NIO** (requisito §3): un `SocketChannel` in modalità bloccante.
+Il server usa una riga JSON per ogni risposta (`\n`); `send()` esegue una
+round-trip scrivendo la richiesta e leggendo la riga-risposta.
 
 ## Stato interno
-- `chan` — `SocketChannel` (config non bloccante, `finishConnect` atteso via
-  `sel.select()`).
-- `sel`, `key` — `Selector` e `SelectionKey` (OP_READ all'avvio, OP_WRITE solo
-  durante la scrittura).
-- `netBuff` — `ByteBuffer` heap da 64 KiB, riusato per ogni `read()`.
-- `lineBytes` — accumulatore di byte della riga parziale; la conversione UTF-8
-  avviene solo dopo `\n`, quindi un carattere multibyte diviso fra due `read()`
-  resta integro.
-- `pendingLines` — coda delle righe complete già lette nello stesso `read()`.
+- `chan` — `SocketChannel` NIO in modalità bloccante, aperto e connesso nel
+  costruttore.
+- `netBuff` — `ByteBuffer` heap da 64 KiB, riusato per ogni `SocketChannel.read()`.
+- `lineBytes` — accumulatore raw della riga parziale; UTF-8 è decodificato solo
+  dopo `\n`, così un carattere multibyte diviso fra due read resta integro.
+- `pendingLines` — coda delle righe complete già ricevute nello stesso read.
 
 ## Metodo principale
 - `Response sendAndRetreive(Request req)` — **`synchronized`**: un unico lock
   copre scrivi+leggi, così il thread CLI e il fetch dall'`UdpClient` non
-  intrecciano le righe. Scrive `GSON.toJson(req)+"\n"`, poi `readLine()`.
+  intrecciano le righe. Scrive tutto il `ByteBuffer` di `GSON.toJson(req)+"\n"`
+  e legge una riga tramite `SocketChannel.read()`.
   (Nella regione critica la round-trip richiesta/risposta è atomica rispetto
   agli altri chiamanti.)
-- `writeAll(ByteBuffer)` (priv) — scrive finché non ha finito; se `write()==0`
-  passa a OP_WRITE + `sel.select()`, poi torna a OP_READ. **NOTA anti busy-spin**:
-  l'interesse WRITE non resta attivo — un SocketChannel è (quasi) sempre
-  scrivibile, quindi un `select()` rientrerebbe subito e `readLine()` andrebbe in
-  busy-spin (100% CPU) invece di attendere la risposta.
-- `readLine()` (priv) — accumula byte fino a `\n`, decodifica allora la riga
-  UTF-8 e restituisce `Response`; conserva in `pendingLines` eventuali righe
-  successive già ricevute. Se manca il delimitatore legge dal canale (non
-  bloccante, `0`→`sel.select()`); oltre 64 KiB senza newline lancia
-  `IOException`. `read()<0` ⇒ `IOException("server chiuso")`.
-- `close()` — chiude canale e selector.
+- `writeAll(ByteBuffer)` (priv) — usa `SocketChannel.write()` bloccante fino a
+  inviare l'intera richiesta.
+- `readLine()` (priv) — usa `SocketChannel.read()` bloccante nel `ByteBuffer`;
+  raccoglie byte fino a `\n`, decodifica la riga UTF-8 e conserva eventuali
+  righe successive. EOF diventa `IOException`; oltre 64 KiB senza newline
+  lancia `IOException`.
+- `close()` — chiude il `SocketChannel`.
 
 ## Concorrenza
 Nessun pool client. L'unico lock è `synchronized (conn)` su
