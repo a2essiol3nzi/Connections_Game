@@ -118,11 +118,12 @@ public class UserStore {
         synchronized (this) {
             Integer id = nameToId.get(username);
             u = id == null ? null : byId.get(id);
+            if (u == null) 
+                return Errors.ERR_INVALID_CREDENTIALS;
         }
-        if (u == null) 
-            return Errors.ERR_INVALID_CREDENTIALS;
         synchronized (u) {
-            if (!Objects.equals(password, u.password)) return Errors.ERR_INVALID_CREDENTIALS;
+            if (!Objects.equals(password, u.password)) 
+                return Errors.ERR_INVALID_CREDENTIALS;
         }
         return null; // OK
     }
